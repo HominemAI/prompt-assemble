@@ -328,7 +328,7 @@ You are a helpful assistant specializing in [[DOMAIN]].
     }
   };
 
-  const saveDocument = async (id: string, revisionComment?: string, skipOverwriteCheck?: boolean, updatedName?: string, isManualSave: boolean = false) => {
+  const saveDocument = async (id: string, revisionComment?: string, skipOverwriteCheck?: boolean, updatedName?: string, isManualSave: boolean = false, contentOverride?: string) => {
     // Prevent concurrent saves
     if (isSavingRef.current) {
       console.log('[saveDocument] Save already in progress, skipping');
@@ -346,6 +346,10 @@ You are a helpful assistant specializing in [[DOMAIN]].
 
     // Use updatedName if provided (for cases where state might not be updated yet)
     const docName = updatedName || doc.name;
+    const contentToSave = contentOverride !== undefined ? contentOverride : doc.content;
+    if (contentOverride !== undefined) {
+      console.log(`[saveDocument] Using content override (${contentOverride.length} chars)`);
+    }
 
     console.log('[saveDocument] CALLED with:', {
       id,
@@ -390,7 +394,7 @@ You are a helpful assistant specializing in [[DOMAIN]].
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: doc.content,
+          content: contentToSave,
           metadata: {
             ...doc.metadata,
             revisionComments: revisionComment,
@@ -996,17 +1000,57 @@ You are a helpful assistant specializing in [[DOMAIN]].
 
       {showVersionHistory && activeDoc && (
         <VersionHistoryModal
+          promptName={activeDoc.name}
           currentRevisionComment={activeDoc.metadata.revisionComments}
           currentSavedAt={activeDoc.savedAt}
-          onRevert={(revisionComment) => {
-            // When reverting, the current version becomes part of history
-            // For now, this will update the metadata with the selected revision
-            updateDocument(activeDocId!, {
-              metadata: {
-                ...activeDoc.metadata,
-                revisionComments: revisionComment,
-              },
-            });
+          onRevert={async (selectedVersion) => {
+            // Call backend to revert to the selected version
+            console.log(`[App] Reverting to version ${selectedVersion.version}`);
+
+            if (activeDocId && activeDoc) {
+              try {
+                const response = await fetch(`/api/prompts/${encodeURIComponent(activeDoc.name)}/revert/${selectedVersion.version}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                });
+
+                if (!response.ok) {
+                  const error = await response.json();
+                  console.error(`[App] Revert failed: ${error.error}`);
+                  return;
+                }
+
+                const data = await response.json();
+                console.log(`[App] Revert successful: new version ${data.newVersion}`);
+
+                // Update document state with the reverted content
+                // We use setDocuments directly instead of updateDocument because
+                // the revert was already persisted to the database, so isDirty should be false
+                setDocuments(docs =>
+                  docs.map(d => {
+                    if (d.id === activeDocId) {
+                      return {
+                        ...d,
+                        content: data.content,
+                        metadata: {
+                          ...d.metadata,
+                          revisionComments: data.revisionComment,
+                        },
+                        savedAt: data.timestamp,
+                        isDirty: false,
+                      };
+                    }
+                    return d;
+                  })
+                );
+                console.log(`[App] Reverted document ${activeDocId} - isDirty set to false`);
+
+                // Refresh prompts list to update metadata
+                loadPrompts(false);
+              } catch (err) {
+                console.error(`[App] Revert error: ${err}`);
+              }
+            }
           }}
           onClose={() => setShowVersionHistory(false)}
         />

@@ -199,6 +199,7 @@ def create_app(source=None, config=None):
                     tags=metadata.get("tags", []),
                     owner=metadata.get("owner"),
                     increment_version=is_backend_save,
+                    revision_comment=metadata.get("revisionComments"),
                 )
                 return jsonify(
                     {
@@ -358,6 +359,147 @@ def create_app(source=None, config=None):
         except Exception as e:
             logger.error(f"Error saving variable sets for {name}: {e}")
             app.prompt_source.connection.rollback()
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/prompts/<name>/revert/<int:version>", methods=["POST"])
+    def revert_prompt(name, version):
+        """Revert a prompt to a previous version."""
+        if not hasattr(app.prompt_source, 'connection'):
+            return jsonify({"error": "Database not available"}), 500
+
+        try:
+            cursor = app.prompt_source.connection.cursor()
+            table_prefix = getattr(app.prompt_source, 'table_prefix', '')
+
+            # Get the prompt ID
+            cursor.execute(
+                f"SELECT id FROM {table_prefix}prompts WHERE name = %s",
+                (name,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({"error": "Prompt not found"}), 404
+
+            prompt_id = row[0]
+            logger.debug(f"[revert_prompt] Reverting {name} to version {version}")
+
+            # Get the specified version's content
+            cursor.execute(
+                f"SELECT content FROM {table_prefix}prompt_versions WHERE prompt_id = %s AND version = %s",
+                (prompt_id, version)
+            )
+            version_row = cursor.fetchone()
+            if not version_row:
+                return jsonify({"error": f"Version {version} not found"}), 404
+
+            old_content = version_row[0]
+            revision_comment = f"Reverted to version {version}"
+
+            # Get current version number to determine new version
+            cursor.execute(
+                f"SELECT version FROM {table_prefix}prompts WHERE id = %s",
+                (prompt_id,)
+            )
+            current_version = cursor.fetchone()[0]
+            new_version = current_version + 1
+
+            # Update prompt with old content and new version
+            cursor.execute(
+                f"UPDATE {table_prefix}prompts SET content = %s, version = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                (old_content, new_version, prompt_id)
+            )
+
+            # Create new version history entry
+            cursor.execute(
+                f"INSERT INTO {table_prefix}prompt_versions (id, prompt_id, version, content, revision_comment) VALUES (%s, %s, %s, %s, %s)",
+                (str(__import__('uuid').uuid4()), prompt_id, new_version, old_content, revision_comment)
+            )
+
+            app.prompt_source.connection.commit()
+            cursor.close()
+
+            logger.info(f"[revert_prompt] Successfully reverted {name} to version {version} (new version: {new_version})")
+            return jsonify({
+                "success": True,
+                "name": name,
+                "newVersion": new_version,
+                "content": old_content,
+                "revisionComment": revision_comment,
+                "timestamp": datetime.utcnow().isoformat()
+            }), 200
+
+        except Exception as e:
+            logger.error(f"[revert_prompt] Error reverting {name} to version {version}: {e}", exc_info=True)
+            if hasattr(app.prompt_source, 'connection'):
+                app.prompt_source.connection.rollback()
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/prompts/<name>/history", methods=["GET"])
+    def get_prompt_history(name):
+        """Get version history for a prompt (max 20 revisions)."""
+        if not hasattr(app.prompt_source, 'connection'):
+            logger.debug(f"[get_prompt_history] No database connection for {name}")
+            return jsonify({"versions": []}), 200
+
+        try:
+            import uuid
+            cursor = app.prompt_source.connection.cursor()
+            table_prefix = getattr(app.prompt_source, 'table_prefix', '')
+            logger.debug(f"[get_prompt_history] Fetching history for {name} (prefix: '{table_prefix}')")
+
+            # Get the prompt ID and current version
+            cursor.execute(
+                f"SELECT id, content, version FROM {table_prefix}prompts WHERE name = %s",
+                (name,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                logger.debug(f"[get_prompt_history] Prompt not found: {name}")
+                return jsonify({"versions": []}), 200
+
+            prompt_id, current_content, current_version = row[0], row[1], row[2]
+            logger.debug(f"[get_prompt_history] Found prompt {name} with id {prompt_id}, version {current_version}")
+
+            # Check if this prompt has any version history
+            cursor.execute(
+                f"SELECT COUNT(*) FROM {table_prefix}prompt_versions WHERE prompt_id = %s",
+                (prompt_id,)
+            )
+            version_count = cursor.fetchone()[0]
+            logger.debug(f"[get_prompt_history] Prompt has {version_count} version history entries")
+
+            # If no version history exists, create an initial entry for the current state
+            if version_count == 0:
+                logger.info(f"[get_prompt_history] Creating initial version history for {name}")
+                cursor.execute(
+                    f"INSERT INTO {table_prefix}prompt_versions (id, prompt_id, version, content, revision_comment, created_at) VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)",
+                    (str(uuid.uuid4()), prompt_id, current_version, current_content, '')
+                )
+                app.prompt_source.connection.commit()
+                version_count = 1
+
+            # Get all versions ordered by version descending (most recent first), limited to 20
+            cursor.execute(
+                f"SELECT version, content, created_at, revision_comment FROM {table_prefix}prompt_versions WHERE prompt_id = %s ORDER BY version DESC LIMIT 20",
+                (prompt_id,)
+            )
+
+            rows = cursor.fetchall()
+            logger.debug(f"[get_prompt_history] Returning {len(rows)} versions for {name}")
+
+            versions = []
+            for version, content, created_at, revision_comment in rows:
+                versions.append({
+                    "version": version,
+                    "content": content,
+                    "createdAt": created_at.isoformat() if created_at else None,
+                    "revisionComment": revision_comment or ""
+                })
+
+            cursor.close()
+            return jsonify({"versions": versions}), 200
+        except Exception as e:
+            logger.error(f"[get_prompt_history] Error getting version history for {name}: {e}", exc_info=True)
             return jsonify({"error": str(e)}), 500
 
     @app.route("/api/tags", methods=["GET"])

@@ -126,12 +126,25 @@ class DatabaseSource(PromptSource):
                     prompt_id TEXT NOT NULL,
                     version INTEGER NOT NULL,
                     content TEXT NOT NULL,
+                    revision_comment TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(prompt_id, version),
                     FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id)
                 )
                 """
             )
+
+            # Add revision_comment column if it doesn't exist (for backwards compatibility)
+            try:
+                cursor.execute(
+                    f"ALTER TABLE {self._table('prompt_versions')} ADD COLUMN revision_comment TEXT"
+                )
+                self.connection.commit()
+                logger.info(f"Added revision_comment column to {self._table('prompt_versions')}")
+            except Exception as e:
+                if "already exists" not in str(e).lower() and "duplicate column" not in str(e).lower():
+                    logger.debug(f"Could not add revision_comment column: {e}")
+                self.connection.rollback()
 
             # Variable Sets tables - these might not exist in older databases
             logger.info("Creating/verifying variable_sets table...")
@@ -393,6 +406,7 @@ class DatabaseSource(PromptSource):
         tags: Optional[List[str]] = None,
         owner: Optional[str] = None,
         increment_version: bool = True,
+        revision_comment: Optional[str] = None,
     ) -> str:
         """
         Save or update a prompt.
@@ -404,6 +418,7 @@ class DatabaseSource(PromptSource):
             tags: List of tags
             owner: Owner identifier
             increment_version: Whether to increment version (False for cache-only saves)
+            revision_comment: Optional comment for this revision
 
         Returns:
             Prompt ID
@@ -432,8 +447,8 @@ class DatabaseSource(PromptSource):
 
                 # Save version history
                 cursor.execute(
-                    f"INSERT INTO {self._table('prompt_versions')} (id, prompt_id, version, content) VALUES (%s, %s, %s, %s)",
-                    (str(uuid.uuid4()), prompt_id, 1, content),
+                    f"INSERT INTO {self._table('prompt_versions')} (id, prompt_id, version, content, revision_comment) VALUES (%s, %s, %s, %s, %s)",
+                    (str(uuid.uuid4()), prompt_id, 1, content, revision_comment),
                 )
             else:
                 prompt_id, current_version = row
@@ -452,8 +467,8 @@ class DatabaseSource(PromptSource):
                 if increment_version:
                     logger.debug(f"Creating version history entry for {name}: version={new_version}")
                     cursor.execute(
-                        f"INSERT INTO {self._table('prompt_versions')} (id, prompt_id, version, content) VALUES (%s, %s, %s, %s)",
-                        (str(uuid.uuid4()), prompt_id, new_version, content),
+                        f"INSERT INTO {self._table('prompt_versions')} (id, prompt_id, version, content, revision_comment) VALUES (%s, %s, %s, %s, %s)",
+                        (str(uuid.uuid4()), prompt_id, new_version, content, revision_comment),
                     )
 
             # Update or create registry entry
@@ -482,6 +497,31 @@ class DatabaseSource(PromptSource):
                     f"INSERT INTO {self._table('prompt_tags')} (prompt_id, tag) VALUES (%s, %s)",
                     (prompt_id, tag),
                 )
+
+            # Clean up old versions - keep only the 20 most recent
+            if increment_version:
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM {self._table('prompt_versions')} WHERE prompt_id = %s",
+                    (prompt_id,),
+                )
+                version_count = cursor.fetchone()[0]
+
+                if version_count > 20:
+                    # Delete oldest versions, keeping only 20 most recent
+                    versions_to_delete = version_count - 20
+                    logger.debug(f"Cleaning up {versions_to_delete} old versions for {name}, keeping 20 most recent")
+                    cursor.execute(
+                        f"""
+                        DELETE FROM {self._table('prompt_versions')}
+                        WHERE prompt_id = %s AND id NOT IN (
+                            SELECT id FROM {self._table('prompt_versions')}
+                            WHERE prompt_id = %s
+                            ORDER BY version DESC
+                            LIMIT 20
+                        )
+                        """,
+                        (prompt_id, prompt_id),
+                    )
 
             self.connection.commit()
             self.refresh()
