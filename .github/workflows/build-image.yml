@@ -108,8 +108,9 @@ jobs:
 
       - name: Pull and test Docker image
         run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }} python -c "import prompt_assemble; print(f'prompt-assemble {prompt_assemble.__version__} loaded successfully')"
+          IMAGE_NAME_LOWER=$(echo ${{ env.IMAGE_NAME }} | tr '[:upper:]' '[:lower:]')
+          docker pull ${{ env.REGISTRY }}/${IMAGE_NAME_LOWER}:${{ steps.version.outputs.VERSION }}
+          docker run --rm ${{ env.REGISTRY }}/${IMAGE_NAME_LOWER}:${{ steps.version.outputs.VERSION }} python -c "import prompt_assemble; print(f'prompt-assemble {prompt_assemble.__version__} loaded successfully')"
 
   notify:
     runs-on: ubuntu-latest
