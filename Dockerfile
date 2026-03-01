@@ -64,5 +64,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Expose port
 EXPOSE 5000
 
-# Default command - start UI server with filesystem source (respects PORT env var)
-CMD ["python", "-c", "from prompt_assemble.sources import FileSystemSource; from prompt_assemble.ui import run_server; source = FileSystemSource('/app/prompts'); run_server(source=source, host='0.0.0.0', debug=False)"]
+# Default command - start UI server (auto-detects source from env vars)
+# If DB_HOSTNAME is set, uses DatabaseSource; otherwise falls back to FileSystemSource
+CMD ["python", "-c", "from prompt_assemble.ui import run_server; run_server(host='0.0.0.0', debug=False)"]
