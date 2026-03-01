@@ -2,6 +2,7 @@
 
 import logging
 import os
+import time
 from typing import Any, Dict, List, Optional
 
 from ..exceptions import PromptNotFoundError, SourceConnectionError
@@ -58,6 +59,10 @@ class DatabaseSource(PromptSource):
 
         self._registry = Registry()
         self._metadata_cache: Dict[str, dict] = {}
+
+        # Auto-refresh configuration
+        self.refresh_interval_seconds = int(os.getenv("PROMPT_ASSEMBLE_REFRESH_INTERVAL", "30"))
+        self._last_refresh_time = 0
 
         # Verify connection and initialize schema
         try:
@@ -249,6 +254,14 @@ class DatabaseSource(PromptSource):
         # Emit refresh event
         self._emit("refreshed")
 
+        # Update last refresh timestamp
+        self._last_refresh_time = time.time()
+
+    def _should_refresh(self) -> bool:
+        """Check if enough time has passed since last refresh."""
+        elapsed = time.time() - self._last_refresh_time
+        return elapsed >= self.refresh_interval_seconds
+
     def _ensure_connection(self):
         """Reconnect if the connection is closed."""
         if hasattr(self, '_connection_factory'):
@@ -263,6 +276,8 @@ class DatabaseSource(PromptSource):
 
     def get_raw(self, name: str) -> str:
         """Get the current version of a prompt by name."""
+        if self._should_refresh():
+            self.refresh()
         self._ensure_connection()
         cursor = self.connection.cursor()
         try:
@@ -360,10 +375,14 @@ class DatabaseSource(PromptSource):
 
     def find_by_tag(self, *tags: str) -> list[str]:
         """Find all prompt names matching ALL tags (AND intersection)."""
+        if self._should_refresh():
+            self.refresh()
         return self._registry.find_by_tags(*tags)
 
     def list(self) -> list[str]:
         """List all available prompt names."""
+        if self._should_refresh():
+            self.refresh()
         return self._registry.list_names()
 
     def save_prompt(
@@ -373,6 +392,7 @@ class DatabaseSource(PromptSource):
         description: str = "",
         tags: Optional[List[str]] = None,
         owner: Optional[str] = None,
+        increment_version: bool = True,
     ) -> str:
         """
         Save or update a prompt.
@@ -383,6 +403,7 @@ class DatabaseSource(PromptSource):
             description: Prompt description
             tags: List of tags
             owner: Owner identifier
+            increment_version: Whether to increment version (False for cache-only saves)
 
         Returns:
             Prompt ID
@@ -416,7 +437,10 @@ class DatabaseSource(PromptSource):
                 )
             else:
                 prompt_id, current_version = row
-                new_version = current_version + 1
+                # Only increment version for real saves, not cache saves
+                new_version = current_version + 1 if increment_version else current_version
+
+                logger.debug(f"Updating existing prompt {name}: current_version={current_version}, new_version={new_version}, increment_version={increment_version}")
 
                 # Update prompt
                 cursor.execute(
@@ -424,11 +448,13 @@ class DatabaseSource(PromptSource):
                     (content, new_version, prompt_id),
                 )
 
-                # Save version history
-                cursor.execute(
-                    f"INSERT INTO {self._table('prompt_versions')} (id, prompt_id, version, content) VALUES (%s, %s, %s, %s)",
-                    (str(uuid.uuid4()), prompt_id, new_version, content),
-                )
+                # Save version history only for real saves (not cache/auto-saves)
+                if increment_version:
+                    logger.debug(f"Creating version history entry for {name}: version={new_version}")
+                    cursor.execute(
+                        f"INSERT INTO {self._table('prompt_versions')} (id, prompt_id, version, content) VALUES (%s, %s, %s, %s)",
+                        (str(uuid.uuid4()), prompt_id, new_version, content),
+                    )
 
             # Update or create registry entry
             cursor.execute(

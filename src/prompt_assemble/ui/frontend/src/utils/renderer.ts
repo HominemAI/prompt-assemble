@@ -78,13 +78,65 @@ export async function renderPrompt(
  * - Multiline: <!-- comment -->
  */
 function stripComments(text: string): string {
-  // Remove single-line comments (#! ...)
-  text = text.replace(/#!.*?$/gm, '');
+  // Remove single-line comments (#! ...) and the entire line they're on
+  text = text.replace(/^[ \t]*#!.*$\n?/gm, '');
 
-  // Remove multiline comments (<!-- ... -->)
-  text = text.replace(/<!--[\s\S]*?-->/g, '');
+  // Remove multiline comments (<!-- ... -->) and the lines they occupy
+  text = text.replace(/^[ \t]*<!--[\s\S]*?-->\n?/gm, '');
 
   return text;
+}
+
+/**
+ * Format XML with proper indentation and newlines.
+ *
+ * @param text - The XML text to format
+ * @param indentSize - Number of spaces per indent level (default 2)
+ * @returns Formatted XML string
+ */
+export function formatXml(text: string, indentSize: number = 2): string {
+  const indent = ' '.repeat(indentSize);
+  let level = 0;
+  let formatted = '';
+  let current = 0;
+
+  // Regex to match tags and text content
+  const tagRegex = /(<[^>]+>)|([^<]+)/g;
+  let match;
+
+  while ((match = tagRegex.exec(text)) !== null) {
+    const tag = match[1];
+    const textContent = match[2];
+
+    if (tag) {
+      // Handle tag
+      const isClosing = tag.startsWith('</');
+      const isSelfClosing = tag.endsWith('/>');
+      const isComment = tag.startsWith('<!--');
+      const isPI = tag.startsWith('<?');
+
+      if (isClosing) {
+        level = Math.max(0, level - 1);
+        formatted += indent.repeat(level) + tag + '\n';
+      } else if (isSelfClosing || isComment || isPI) {
+        formatted += indent.repeat(level) + tag + '\n';
+      } else {
+        formatted += indent.repeat(level) + tag + '\n';
+        level++;
+      }
+    } else if (textContent) {
+      // Handle text content
+      const trimmed = textContent.trim();
+      if (trimmed.length > 0) {
+        formatted += indent.repeat(level) + trimmed + '\n';
+      }
+    }
+  }
+
+  // Remove trailing newlines and clean up multiple consecutive newlines
+  return formatted
+    .replace(/\n\s*\n/g, '\n')
+    .trim();
 }
 
 /**
@@ -99,7 +151,9 @@ function parsePromptTagSigil(content: string): [number | null, string[]] {
   const trimmed = content.trim();
 
   if (trimmed.includes(':')) {
-    const [limitStr, tagsStr] = trimmed.split(':', 1);
+    const colonIdx = trimmed.indexOf(':');
+    const limitStr = trimmed.substring(0, colonIdx);
+    const tagsStr = trimmed.substring(colonIdx + 1);
     const limit = parseInt(limitStr.trim(), 10);
     const tags = tagsStr
       .split(',')

@@ -117,11 +117,11 @@ CREATE TABLE variable_sets (
 CREATE TABLE variable_set_variables (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   variable_set_id UUID REFERENCES variable_sets(id),
-  name VARCHAR(255) NOT NULL,
+  key VARCHAR(255) NOT NULL,
   value TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE (variable_set_id, name)
+  UNIQUE (variable_set_id, key)
 );
 ```
 

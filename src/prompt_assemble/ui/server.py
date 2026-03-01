@@ -85,28 +85,41 @@ def create_app(source=None, config=None):
             return jsonify({"error": "No prompt source configured"}), 500
 
         try:
+            import time
+            start_time = time.time()
+
+            all_prompt_names = app.prompt_source.list()
+            logger.info(f"[list_prompts] Total prompts in source: {len(all_prompt_names)}")
+
+            # Pre-fetch all timestamps if using database source (avoid N+1 queries)
+            timestamps = {}
+            if hasattr(app.prompt_source, 'connection'):
+                cursor = app.prompt_source.connection.cursor()
+                try:
+                    cursor.execute(f"SELECT name, updated_at FROM {app.prompt_source._table('prompts')}")
+                    rows = cursor.fetchall()
+                    logger.info(f"[list_prompts] Fetched {len(rows)} timestamps from database")
+                    for row in rows:
+                        timestamps[row[0]] = row[1]
+                finally:
+                    cursor.close()
+
             prompts = []
-            for name in app.prompt_source.list():
+            skipped_count = 0
+            for name in all_prompt_names:
                 # Filter out "Untitled" or "untitled" prompts
                 if name.lower() == "untitled":
-                    logger.debug(f"Skipping 'untitled' prompt in list")
+                    skipped_count += 1
                     continue
 
                 prompt_data = _get_prompt_metadata(app.prompt_source, name)
-                # Add updated_at timestamp if available
-                if hasattr(app.prompt_source, 'connection'):
-                    cursor = app.prompt_source.connection.cursor()
-                    try:
-                        cursor.execute(
-                            f"SELECT updated_at FROM {app.prompt_source._table('prompts')} WHERE name = %s",
-                            (name,)
-                        )
-                        row = cursor.fetchone()
-                        if row and row[0]:
-                            prompt_data['updated_at'] = row[0].isoformat()
-                    finally:
-                        cursor.close()
+                # Add pre-fetched timestamp
+                if name in timestamps and timestamps[name]:
+                    prompt_data['updated_at'] = timestamps[name].isoformat()
                 prompts.append(prompt_data)
+
+            elapsed = time.time() - start_time
+            logger.info(f"[list_prompts] Returned {len(prompts)} prompts (skipped {skipped_count} untitled), took {elapsed:.3f}s")
 
             return jsonify({"prompts": prompts})
         except Exception as e:
@@ -172,6 +185,7 @@ def create_app(source=None, config=None):
             data = request.json
             content = data.get("content")
             metadata = data.get("metadata", {})
+            is_backend_save = data.get("isBackendSave", True)  # Default to True for backward compatibility
 
             if not content:
                 return jsonify({"error": "Content required"}), 400
@@ -184,6 +198,7 @@ def create_app(source=None, config=None):
                     description=metadata.get("description", ""),
                     tags=metadata.get("tags", []),
                     owner=metadata.get("owner"),
+                    increment_version=is_backend_save,
                 )
                 return jsonify(
                     {
@@ -236,6 +251,113 @@ def create_app(source=None, config=None):
             if "not found" in str(e).lower():
                 logger.warning(f"Prompt not found: {name}")
                 return jsonify({"error": "Prompt not found"}), 404
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/prompts/<name>/variable-sets", methods=["GET"])
+    def get_prompt_variable_sets(name):
+        """Get variable set subscriptions for a prompt/document."""
+        if not hasattr(app.prompt_source, 'connection'):
+            return jsonify({"variableSetIds": [], "overrides": {}}), 200
+
+        try:
+            cursor = app.prompt_source.connection.cursor()
+            table_prefix = getattr(app.prompt_source, 'table_prefix', '')
+
+            # Get the prompt ID
+            cursor.execute(
+                f"SELECT id FROM {table_prefix}prompts WHERE name = %s",
+                (name,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({"variableSetIds": [], "overrides": {}}), 200
+
+            prompt_id = row[0]
+
+            # Get variable set subscriptions
+            cursor.execute(
+                f"SELECT variable_set_id FROM {table_prefix}variable_set_selections WHERE prompt_id = %s ORDER BY list_order",
+                (prompt_id,)
+            )
+            variable_set_ids = [row[0] for row in cursor.fetchall()]
+
+            # Get overrides
+            cursor.execute(
+                f"SELECT variable_set_id, key, override_value FROM {table_prefix}variable_set_overrides WHERE prompt_id = %s",
+                (prompt_id,)
+            )
+
+            overrides = {}
+            for var_set_id, key, value in cursor.fetchall():
+                if var_set_id not in overrides:
+                    overrides[var_set_id] = {}
+                overrides[var_set_id][key] = value
+
+            cursor.close()
+            return jsonify({"variableSetIds": variable_set_ids, "overrides": overrides}), 200
+        except Exception as e:
+            logger.error(f"Error getting variable sets for {name}: {e}")
+            return jsonify({"variableSetIds": [], "overrides": {}}), 200
+
+    @app.route("/api/prompts/<name>/variable-sets", methods=["POST"])
+    def save_prompt_variable_sets(name):
+        """Save variable set subscriptions for a prompt/document."""
+        if not hasattr(app.prompt_source, 'connection'):
+            return jsonify({"error": "Database source not available"}), 400
+
+        try:
+            data = request.json
+            variable_set_ids = data.get("variableSetIds", [])
+            overrides = data.get("overrides", {})
+
+            cursor = app.prompt_source.connection.cursor()
+            table_prefix = getattr(app.prompt_source, 'table_prefix', '')
+
+            # Get the prompt ID
+            cursor.execute(
+                f"SELECT id FROM {table_prefix}prompts WHERE name = %s",
+                (name,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({"error": "Prompt not found"}), 404
+
+            prompt_id = row[0]
+
+            # Clear existing subscriptions
+            cursor.execute(
+                f"DELETE FROM {table_prefix}variable_set_selections WHERE prompt_id = %s",
+                (prompt_id,)
+            )
+
+            # Insert new subscriptions
+            for order, var_set_id in enumerate(variable_set_ids):
+                cursor.execute(
+                    f"INSERT INTO {table_prefix}variable_set_selections (id, prompt_id, variable_set_id, list_order, created_at, updated_at) VALUES (gen_random_uuid(), %s, %s, %s, NOW(), NOW())",
+                    (prompt_id, var_set_id, order)
+                )
+
+            # Clear existing overrides
+            cursor.execute(
+                f"DELETE FROM {table_prefix}variable_set_overrides WHERE prompt_id = %s",
+                (prompt_id,)
+            )
+
+            # Insert new overrides
+            for var_set_id, var_overrides in overrides.items():
+                for key, value in var_overrides.items():
+                    cursor.execute(
+                        f"INSERT INTO {table_prefix}variable_set_overrides (id, prompt_id, variable_set_id, key, override_value, created_at, updated_at) VALUES (gen_random_uuid(), %s, %s, %s, %s, NOW(), NOW())",
+                        (prompt_id, var_set_id, key, value)
+                    )
+
+            app.prompt_source.connection.commit()
+            cursor.close()
+
+            return jsonify({"success": True, "name": name}), 200
+        except Exception as e:
+            logger.error(f"Error saving variable sets for {name}: {e}")
+            app.prompt_source.connection.rollback()
             return jsonify({"error": str(e)}), 500
 
     @app.route("/api/tags", methods=["GET"])

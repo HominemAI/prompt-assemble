@@ -72,12 +72,9 @@ const App: React.FC = () => {
       const docs = saved ? JSON.parse(saved) : [];
       // Filter out Untitled documents - they should not persist across sessions
       const filtered = docs.filter((doc: Document) => doc.name !== 'Untitled');
-      // Clear isDirty flag when loading from localStorage (except for new/unsaved docs)
-      // New documents (Untitled or never saved) should stay marked as unsaved
-      // Also reset lock state - it's a session-specific UI state
+      // Preserve isDirty state from localStorage, only reset lock state (session-specific)
       return filtered.map((doc: Document) => ({
         ...doc,
-        isDirty: (doc.name === 'Untitled' || !doc.savedAt) ? true : false,
         isLocked: false, // Reset lock state when reloading from storage
       }));
     }
@@ -135,12 +132,17 @@ const App: React.FC = () => {
 
   // Persist ONLY saved documents to localStorage (must have savedAt timestamp)
   // This ensures closed tabs don't reopen - they must be saved to persist
+  // Debounced to avoid excessive writes on every keystroke
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const documentsToSave = documents.filter((doc) => doc.savedAt && doc.name !== 'Untitled');
-      console.log('Persisting to localStorage:', documentsToSave.length, 'saved documents');
-      window.localStorage.setItem('editor-documents', JSON.stringify(documentsToSave));
-    }
+    const timer = setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        const documentsToSave = documents.filter((doc) => doc.savedAt && doc.name !== 'Untitled');
+        console.log('Persisting to localStorage:', documentsToSave.length, 'saved documents');
+        window.localStorage.setItem('editor-documents', JSON.stringify(documentsToSave));
+      }
+    }, 500); // Debounce: only persist after 500ms of no changes
+
+    return () => clearTimeout(timer);
   }, [documents]);
 
   // Persist active doc ID to localStorage
@@ -320,31 +322,9 @@ You are a helpful assistant specializing in [[DOMAIN]].
     const doc = documents.find((d) => d.id === id);
     if (doc && updates.content !== undefined) {
       console.log(`[updateDocument] Content changed for doc ${id}, setting debounce timer (doc is "${doc.name}")`);
-      // Content changed - reset the timer
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-      }
-
-      if (doc.name && doc.name !== 'Untitled') {
-        autoSaveTimerRef.current = setTimeout(() => {
-          const currentDoc = documents.find((d) => d.id === id);
-          console.log(`[autoSaveTimer] Timer fired for doc ${id}:`, {
-            exists: !!currentDoc,
-            isDirty: currentDoc?.isDirty,
-            isSaving: isSavingRef.current,
-            name: currentDoc?.name,
-          });
-          if (currentDoc && currentDoc.isDirty && !isSavingRef.current) {
-            console.log(`[autoSaveTimer] Calling saveDocument for ${id}`);
-            saveDocument(id);
-          } else if (currentDoc && !currentDoc.isDirty) {
-            console.log(`[autoSaveTimer] Skipping save - isDirty is false for ${id}`);
-          }
-          autoSaveTimerRef.current = null;
-        }, 2000);
-      } else {
-        console.log(`[updateDocument] Skipping timer for "${doc.name}" - is Untitled or invalid`);
-      }
+      // Content changed - auto-save to cache is handled by the localStorage effect
+      // No need to set a timer - the localStorage effect is already debounced
+      console.log(`[updateDocument] Content changed for doc ${id} - will be saved to cache via localStorage effect`);
     }
   };
 
@@ -415,6 +395,7 @@ You are a helpful assistant specializing in [[DOMAIN]].
             ...doc.metadata,
             revisionComments: revisionComment,
           },
+          isBackendSave: isManualSave,
         }),
       });
 
@@ -442,8 +423,28 @@ You are a helpful assistant specializing in [[DOMAIN]].
         );
         // Remove from pending if it was queued
         pendingSavesRef.current.delete(id);
-        // Refresh the search list so the new/updated document appears
-        loadPrompts(false);
+        // Only refresh prompts on manual saves to avoid overwriting user typing during auto-save
+        if (isManualSave) {
+          loadPrompts(false);
+        }
+
+        // Save variable set subscriptions if this is a database-backed document
+        const varSetIds = doc.variableSetIds || [];
+        const overrides = doc.variableOverrides || {};
+        if (varSetIds.length > 0 || Object.keys(overrides).length > 0) {
+          try {
+            await fetch(`/api/prompts/${encodeURIComponent(docName)}/variable-sets`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                variableSetIds: varSetIds,
+                overrides: overrides,
+              }),
+            });
+          } catch (e) {
+            console.warn('Failed to save variable set subscriptions:', e);
+          }
+        }
       } else {
         console.error('Save failed:', response.status, response.statusText);
         // Queue for retry if offline
@@ -617,6 +618,41 @@ You are a helpful assistant specializing in [[DOMAIN]].
     }
   };
 
+  const closeAllDocuments = () => {
+    // Check if any documents are dirty or locked
+    const dirtyDocs = documents.filter((d) => d.isDirty);
+    const lockedDocs = documents.filter((d) => d.isLocked);
+
+    if (lockedDocs.length > 0) {
+      setAlertModal({
+        isOpen: true,
+        title: 'Cannot Close All',
+        message: `Cannot close all tabs - ${lockedDocs.length} tab(s) are locked.`,
+      });
+      return;
+    }
+
+    if (dirtyDocs.length > 0) {
+      setConfirmModal({
+        isOpen: true,
+        title: 'Close All Tabs?',
+        message: `Close all ${documents.length} tab(s)? You have ${dirtyDocs.length} unsaved changes.`,
+        confirmText: 'Close All',
+        cancelText: 'Cancel',
+        isDangerous: true,
+        onConfirm: () => {
+          setDocuments([]);
+          setActiveDocId(null);
+        },
+      });
+      return;
+    }
+
+    // If no dirty or locked docs, just close all
+    setDocuments([]);
+    setActiveDocId(null);
+  };
+
   const toggleLockDocument = (id: string) => {
     updateDocument(id, { isLocked: !getActiveDocument()?.isLocked });
   };
@@ -771,6 +807,15 @@ You are a helpful assistant specializing in [[DOMAIN]].
         <div className="right-panel">
           <div className="editor-header">
             <div className="tabs-container">
+              {documents.length > 0 && (
+                <button
+                  className="tab-close-all"
+                  onClick={closeAllDocuments}
+                  title="Close all tabs"
+                >
+                  <FiX size={16} />
+                </button>
+              )}
               {documents.map((doc) => (
                 <div
                   key={doc.id}

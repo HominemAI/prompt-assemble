@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { FiX, FiCopy } from 'react-icons/fi';
-import { renderPrompt } from '../utils/renderer';
+import { renderPrompt, formatXml } from '../utils/renderer';
 import { xmlToJson } from '../utils/xmlToJson';
 import '../styles/RenderModal.css';
 
@@ -103,6 +103,41 @@ const RenderModal: React.FC<RenderModalProps> = ({
           documentsCount: documents.length,
         });
 
+        // Load variable set subscriptions for the current document
+        let mergedVariables = { ...variables };
+
+        // Try to get currentDocId from documents
+        const currentDoc = documents.find((d) => d.content === content);
+        if (currentDoc && currentDoc.name) {
+          try {
+            const response = await fetch(`/api/prompts/${encodeURIComponent(currentDoc.name)}/variable-sets`);
+            if (response.ok) {
+              const data = await response.json();
+              const { variableSetIds, overrides } = data;
+
+              // Merge variables from subscribed variable sets
+              for (const varSetId of variableSetIds) {
+                const varSet = variableSets.find((vs) => vs.id === varSetId);
+                if (varSet && varSet.variables) {
+                  // Add variables from this set
+                  for (const varName in varSet.variables) {
+                    mergedVariables[varName] = varSet.variables[varName];
+                  }
+                }
+              }
+
+              // Apply overrides (overrides take precedence)
+              for (const varSetId in overrides) {
+                for (const varName in overrides[varSetId]) {
+                  mergedVariables[varName] = overrides[varSetId][varName];
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to load variable sets:', e);
+          }
+        }
+
         // Build fetcher for prompts
         const fetchPrompt = async (name: string): Promise<string> => {
           // First check in-memory prompts
@@ -152,7 +187,7 @@ const RenderModal: React.FC<RenderModalProps> = ({
         // Render the prompt with variable hierarchy support
         const rendered = await renderPrompt(
           content,
-          variables,
+          mergedVariables,
           fetchPrompt,
           findByTags,
           getPromptVariables
@@ -190,7 +225,7 @@ const RenderModal: React.FC<RenderModalProps> = ({
 
   if (!isOpen) return null;
 
-  const displayOutput = outputFormat === 'json' ? xmlToJson(output) : output;
+  const displayOutput = outputFormat === 'json' ? xmlToJson(output) : formatXml(output);
 
   return (
     <div
