@@ -24,9 +24,18 @@ const VariableSetsSelection: React.FC<VariableSetsSelectionProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [tempSelectedIds, setTempSelectedIds] = useState<string[]>(selectedSetIds);
 
-  const filteredSets = allVariableSets.filter((set) =>
-    set.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Debug logging
+  console.log('VariableSetsSelection opened:', {
+    allVariableSetsCount: allVariableSets.length,
+    allVariableSets: allVariableSets,
+    selectedSetIds: selectedSetIds,
+  });
+
+  const filteredSets = allVariableSets.filter((set) => {
+    const matchesSearch = set.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const notAlreadySelected = !selectedSetIds.includes(set.id);
+    return matchesSearch && notAlreadySelected;
+  });
 
   const handleToggleSet = (setId: string) => {
     if (tempSelectedIds.includes(setId)) {

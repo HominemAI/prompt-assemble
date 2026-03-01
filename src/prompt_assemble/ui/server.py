@@ -255,6 +255,156 @@ def create_app(source=None, config=None):
             logger.error(f"Error listing tags: {e}")
             return jsonify({"error": str(e)}), 500
 
+    @app.route("/api/variable-sets", methods=["GET"])
+    def list_variable_sets():
+        """List all available variable sets."""
+        try:
+            # Check if source is database-backed and has connection
+            if not hasattr(app.prompt_source, 'connection'):
+                # For file-based sources, return empty list
+                return jsonify({"variable_sets": []})
+
+            connection = app.prompt_source.connection
+
+            # Try to query variable sets - if tables don't exist, return empty list
+            try:
+                cursor = connection.cursor()
+
+                # Query all variable sets ordered by updated_at descending
+                table_prefix = getattr(app.prompt_source, 'table_prefix', '')
+                table_name = f"{table_prefix}variable_sets" if table_prefix else "variable_sets"
+                var_table_name = f"{table_prefix}variable_set_variables" if table_prefix else "variable_set_variables"
+
+                cursor.execute(f"SELECT id, name, updated_at FROM {table_name} ORDER BY updated_at DESC")
+                rows = cursor.fetchall()
+
+                variable_sets = []
+                for row in rows:
+                    set_id = row[0]
+                    set_name = row[1]
+
+                    # Fetch variables for this set
+                    cursor.execute(
+                        f"SELECT key, value FROM {var_table_name} WHERE variable_set_id = %s ORDER BY key",
+                        (set_id,)
+                    )
+                    variables = {}
+                    for var_row in cursor.fetchall():
+                        variables[var_row[0]] = var_row[1]
+
+                    variable_sets.append({
+                        "id": set_id,
+                        "name": set_name,
+                        "variables": variables
+                    })
+
+                return jsonify({"variable_sets": variable_sets})
+            except Exception as query_error:
+                # If tables don't exist or query fails, reset transaction and return empty
+                try:
+                    connection.rollback()
+                except:
+                    pass
+                logger.debug(f"Variable sets not available: {query_error}")
+                return jsonify({"variable_sets": []})
+        except Exception as e:
+            logger.error(f"Error listing variable sets: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/variable-sets", methods=["POST"])
+    def create_variable_set():
+        """Create or update a variable set."""
+        try:
+            if not hasattr(app.prompt_source, 'connection'):
+                return jsonify({"error": "Database not available"}), 500
+
+            connection = app.prompt_source.connection
+            data = request.json
+            set_id = data.get('id')
+            set_name = data.get('name')
+            variables = data.get('variables', {})
+
+            if not set_id or not set_name:
+                return jsonify({"error": "Missing id or name"}), 400
+
+            cursor = connection.cursor()
+            table_prefix = getattr(app.prompt_source, 'table_prefix', '')
+            vs_table = f"{table_prefix}variable_sets" if table_prefix else "variable_sets"
+            vsv_table = f"{table_prefix}variable_set_variables" if table_prefix else "variable_set_variables"
+
+            try:
+                # Check if set exists
+                cursor.execute(f"SELECT id FROM {vs_table} WHERE id = %s", (set_id,))
+                exists = cursor.fetchone() is not None
+
+                if exists:
+                    # Update existing set name
+                    cursor.execute(
+                        f"UPDATE {vs_table} SET name = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                        (set_name, set_id)
+                    )
+                else:
+                    # Insert new set
+                    cursor.execute(
+                        f"INSERT INTO {vs_table} (id, name) VALUES (%s, %s)",
+                        (set_id, set_name)
+                    )
+
+                # Clear existing variables and insert new ones
+                cursor.execute(f"DELETE FROM {vsv_table} WHERE variable_set_id = %s", (set_id,))
+
+                for key, value in variables.items():
+                    var_id = f"{set_id}-{key}"
+                    cursor.execute(
+                        f"INSERT INTO {vsv_table} (id, variable_set_id, key, value) VALUES (%s, %s, %s, %s)",
+                        (var_id, set_id, key, value)
+                    )
+
+                connection.commit()
+                return jsonify({"id": set_id, "name": set_name, "variables": variables}), 201
+
+            except Exception as query_error:
+                try:
+                    connection.rollback()
+                except:
+                    pass
+                logger.debug(f"Could not create variable set: {query_error}")
+                return jsonify({"error": str(query_error)}), 500
+        except Exception as e:
+            logger.error(f"Error creating variable set: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/variable-sets/<set_id>", methods=["DELETE"])
+    def delete_variable_set(set_id):
+        """Delete a variable set."""
+        try:
+            if not hasattr(app.prompt_source, 'connection'):
+                return jsonify({"error": "Database not available"}), 500
+
+            connection = app.prompt_source.connection
+            cursor = connection.cursor()
+            table_prefix = getattr(app.prompt_source, 'table_prefix', '')
+            vs_table = f"{table_prefix}variable_sets" if table_prefix else "variable_sets"
+            vsv_table = f"{table_prefix}variable_set_variables" if table_prefix else "variable_set_variables"
+
+            try:
+                # Delete variables first (cascade)
+                cursor.execute(f"DELETE FROM {vsv_table} WHERE variable_set_id = %s", (set_id,))
+                # Delete the set
+                cursor.execute(f"DELETE FROM {vs_table} WHERE id = %s", (set_id,))
+                connection.commit()
+                return jsonify({"success": True}), 200
+            except Exception as query_error:
+                try:
+                    connection.rollback()
+                except:
+                    pass
+                logger.debug(f"Could not delete variable set: {query_error}")
+                return jsonify({"error": str(query_error)}), 500
+        except Exception as e:
+            logger.error(f"Error deleting variable set: {e}")
+            return jsonify({"error": str(e)}), 500
+
     @app.route("/api/export", methods=["POST"])
     def export_prompts():
         """Export prompts as JSON."""
@@ -357,16 +507,31 @@ def run_server(
     Run the UI server.
 
     Args:
-        source: PromptSource instance
+        source: PromptSource instance (if None, auto-creates from env vars)
         host: Server host
         port: Server port (defaults to env var PORT or 8000)
         debug: Enable debug mode
+
+    Environment Variables:
+        PROMPT_ASSEMBLE_UI: Must be 'true' to enable UI
+        PORT: Server port (default: 8000)
+        DB_HOSTNAME: PostgreSQL hostname (for auto-created DatabaseSource)
+        DB_PASSWORD: PostgreSQL password (required if DB_HOSTNAME set)
     """
     if not os.getenv("PROMPT_ASSEMBLE_UI", "").lower() == "true":
         logger.warning(
             "Set PROMPT_ASSEMBLE_UI=true environment variable to enable UI"
         )
         return
+
+    # If no source provided, try to auto-create from environment
+    if source is None and os.getenv("DB_HOSTNAME"):
+        try:
+            from ..sources import create_database_source_from_env
+            logger.info("Auto-creating DatabaseSource from environment variables")
+            source = create_database_source_from_env()
+        except Exception as e:
+            logger.warning(f"Could not auto-create DatabaseSource: {e}")
 
     # Determine port: command line arg > env var > default
     if port is None:

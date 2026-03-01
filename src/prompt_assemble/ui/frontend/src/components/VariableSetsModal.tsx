@@ -12,6 +12,7 @@ interface VariableSet {
 interface VariableSetsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onVariableSetsChanged?: () => void;
 }
 
 interface NameInputState {
@@ -21,7 +22,7 @@ interface NameInputState {
   setId?: string;
 }
 
-const VariableSetsModal: React.FC<VariableSetsModalProps> = ({ isOpen, onClose }) => {
+const VariableSetsModal: React.FC<VariableSetsModalProps> = ({ isOpen, onClose, onVariableSetsChanged }) => {
   const [variableSets, setVariableSets] = useState<VariableSet[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSetId, setSelectedSetId] = useState<string | null>(null);
@@ -30,6 +31,90 @@ const VariableSetsModal: React.FC<VariableSetsModalProps> = ({ isOpen, onClose }
     value: '',
     isNewSet: false,
   });
+
+  // Load variable sets from server on mount
+  useEffect(() => {
+    if (isOpen) {
+      loadVariableSets();
+    }
+  }, [isOpen]);
+
+  // Save to localStorage whenever variable sets change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('variable-sets', JSON.stringify(variableSets));
+    }
+  }, [variableSets]);
+
+  const loadVariableSets = async () => {
+    try {
+      const response = await fetch('/api/variable-sets');
+      if (response.ok) {
+        const data = await response.json();
+        setVariableSets(data.variable_sets || []);
+      } else {
+        // Fall back to localStorage if server fails
+        loadFromLocalStorage();
+      }
+    } catch (error) {
+      console.error('Error loading variable sets:', error);
+      // Fall back to localStorage if fetch fails
+      loadFromLocalStorage();
+    }
+  };
+
+  const loadFromLocalStorage = () => {
+    if (typeof window !== 'undefined') {
+      const cached = window.localStorage.getItem('variable-sets');
+      if (cached) {
+        try {
+          setVariableSets(JSON.parse(cached));
+        } catch (e) {
+          console.error('Error parsing cached variable sets:', e);
+        }
+      }
+    }
+  };
+
+  const saveVariableSetToServer = async (set: VariableSet) => {
+    try {
+      const response = await fetch('/api/variable-sets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(set),
+      });
+      if (!response.ok) {
+        console.error('Failed to save variable set');
+      }
+      // Reload after save
+      await loadVariableSets();
+      // Notify parent
+      if (onVariableSetsChanged) {
+        onVariableSetsChanged();
+      }
+    } catch (error) {
+      console.error('Error saving variable set:', error);
+    }
+  };
+
+  const deleteVariableSetFromServer = async (setId: string) => {
+    try {
+      const response = await fetch(`/api/variable-sets/${setId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        console.error('Failed to delete variable set');
+      }
+      // Reload after delete
+      await loadVariableSets();
+      // Notify parent
+      if (onVariableSetsChanged) {
+        onVariableSetsChanged();
+      }
+    } catch (error) {
+      console.error('Error deleting variable set:', error);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -59,10 +144,14 @@ const VariableSetsModal: React.FC<VariableSetsModalProps> = ({ isOpen, onClose }
           onSave={(updatedSet) => {
             setVariableSets(variableSets.map((s) => (s.id === updatedSet.id ? updatedSet : s)));
             setSelectedSetId(null);
+            // Save to server
+            saveVariableSetToServer(updatedSet);
           }}
           onDelete={(id) => {
             setVariableSets(variableSets.filter((s) => s.id !== id));
             setSelectedSetId(null);
+            // Delete from server
+            deleteVariableSetFromServer(id);
           }}
         />
       );
@@ -77,7 +166,7 @@ const VariableSetsModal: React.FC<VariableSetsModalProps> = ({ isOpen, onClose }
     });
   };
 
-  const handleSaveName = () => {
+  const handleSaveName = async () => {
     if (!nameInput.value.trim()) {
       alert('Please enter a name for the variable set');
       return;
@@ -91,13 +180,21 @@ const VariableSetsModal: React.FC<VariableSetsModalProps> = ({ isOpen, onClose }
       };
       setVariableSets([...variableSets, newSet]);
       setSelectedSetId(newSet.id);
+      // Save to server
+      await saveVariableSetToServer(newSet);
     } else if (nameInput.setId) {
       // Rename existing set
-      setVariableSets(
-        variableSets.map((set) =>
-          set.id === nameInput.setId ? { ...set, name: nameInput.value } : set
-        )
-      );
+      const renamedSet = variableSets.find((s) => s.id === nameInput.setId);
+      if (renamedSet) {
+        const updatedSet = { ...renamedSet, name: nameInput.value };
+        setVariableSets(
+          variableSets.map((set) =>
+            set.id === nameInput.setId ? updatedSet : set
+          )
+        );
+        // Save to server
+        await saveVariableSetToServer(updatedSet);
+      }
     }
 
     setNameInput({

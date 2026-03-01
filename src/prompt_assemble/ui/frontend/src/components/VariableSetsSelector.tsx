@@ -19,12 +19,14 @@ interface VariableSetsSelectionProps {
   isOpen: boolean;
   onClose: () => void;
   allVariableSets: VariableSet[];
+  onSave?: (ids: string[], overrides: Record<string, Record<string, string>>) => void;
 }
 
 const VariableSetsSelector: React.FC<VariableSetsSelectionProps> = ({
   isOpen,
   onClose,
   allVariableSets,
+  onSave,
 }) => {
   const [selectedSetIds, setSelectedSetIds] = useState<string[]>([]);
   const [overrides, setOverrides] = useState<VariableSetOverrides[]>([]);
@@ -65,6 +67,18 @@ const VariableSetsSelector: React.FC<VariableSetsSelectionProps> = ({
     setShowOverride(null);
   };
 
+  const handleClose = () => {
+    // Persist selected sets and overrides before closing
+    if (onSave) {
+      const overridesMap: Record<string, Record<string, string>> = {};
+      for (const override of overrides) {
+        overridesMap[override.setId] = override.overrides;
+      }
+      onSave(selectedSetIds, overridesMap);
+    }
+    onClose();
+  };
+
   // Show selection modal if needed
   if (showSelection) {
     return (
@@ -94,11 +108,11 @@ const VariableSetsSelector: React.FC<VariableSetsSelectionProps> = ({
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-content variable-sets-selector" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Active Variable Sets</h2>
-          <button className="modal-close-btn" onClick={onClose}>
+          <button className="modal-close-btn" onClick={handleClose}>
             <FiX size={20} />
           </button>
         </div>

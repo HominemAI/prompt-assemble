@@ -13,6 +13,7 @@ import {
   FiMoon,
   FiCode,
   FiClock,
+  FiPlay,
 } from 'react-icons/fi';
 import { useTheme } from './hooks/useTheme';
 import PromptExplorer from './components/PromptExplorer';
@@ -25,6 +26,7 @@ import AlertModal from './components/AlertModal';
 import ConfirmModal from './components/ConfirmModal';
 import VariableSetsModal from './components/VariableSetsModal';
 import VariableSetsSelector from './components/VariableSetsSelector';
+import RenderModal from './components/RenderModal';
 import './App.css';
 
 interface VariableSet {
@@ -104,6 +106,7 @@ const App: React.FC = () => {
   const [variableSets, setVariableSets] = useState<VariableSet[]>([]);
   const [showVariableSetsModal, setShowVariableSetsModal] = useState(false);
   const [showVariableSetSelector, setShowVariableSetSelector] = useState(false);
+  const [showRenderModal, setShowRenderModal] = useState(false);
 
   // Modal state
   const [alertModal, setAlertModal] = useState<{ isOpen: boolean; title: string; message: string }>({
@@ -220,6 +223,29 @@ const App: React.FC = () => {
 
   const getActiveDocument = (): Document | undefined => {
     return documents.find((d) => d.id === activeDocId);
+  };
+
+  const getMergedVariables = (): Record<string, string> => {
+    const activeDoc = getActiveDocument();
+    if (!activeDoc) return {};
+
+    const setIds = activeDoc.variableSetIds || [];
+    const overrides = activeDoc.variableOverrides || {};
+    let merged: Record<string, string> = {};
+
+    // Merge variables from each active set
+    for (const setId of setIds) {
+      const varSet = variableSets.find((vs) => vs.id === setId);
+      if (varSet) {
+        merged = { ...merged, ...varSet.variables };
+      }
+
+      // Apply overrides for this set (overrides win)
+      const setOverrides = overrides[setId] || {};
+      merged = { ...merged, ...setOverrides };
+    }
+
+    return merged;
   };
 
   const createNewDocument = () => {
@@ -819,6 +845,14 @@ You are a helpful assistant specializing in [[DOMAIN]].
                   <FiCode size={18} />
                   Variables
                 </button>
+                <button
+                  className="btn btn-default"
+                  onClick={() => setShowRenderModal(true)}
+                  title="Render prompt with variable substitution"
+                >
+                  <FiPlay size={18} />
+                  Render
+                </button>
                 <div style={{ marginLeft: 'auto' }} />
                 <button
                   className="btn btn-secondary"
@@ -937,6 +971,7 @@ You are a helpful assistant specializing in [[DOMAIN]].
       <VariableSetsModal
         isOpen={showVariableSetsModal}
         onClose={() => setShowVariableSetsModal(false)}
+        onVariableSetsChanged={loadVariableSets}
       />
 
       {/* Variable Sets Selector (per-document) */}
@@ -945,6 +980,23 @@ You are a helpful assistant specializing in [[DOMAIN]].
           isOpen={showVariableSetSelector}
           onClose={() => setShowVariableSetSelector(false)}
           allVariableSets={variableSets}
+          onSave={(ids, overrides) => {
+            updateDocument(activeDocId!, {
+              variableSetIds: ids,
+              variableOverrides: overrides,
+            });
+          }}
+        />
+      )}
+
+      {/* Render Modal */}
+      {activeDoc && (
+        <RenderModal
+          isOpen={showRenderModal}
+          content={activeDoc.content}
+          variables={getMergedVariables()}
+          allPrompts={prompts}
+          onClose={() => setShowRenderModal(false)}
         />
       )}
 

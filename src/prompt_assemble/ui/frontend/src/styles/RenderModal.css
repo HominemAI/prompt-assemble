@@ -1,0 +1,234 @@
+.render-modal {
+  display: flex;
+  flex-direction: column;
+  width: 90%;
+  max-width: 900px;
+  height: 80vh;
+  max-height: 80vh;
+  background: var(--bg-primary, #ffffff);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+/* Dark mode support */
+.dark-theme .render-modal {
+  background: var(--bg-primary, #1a1a1a);
+  color: var(--text-primary, #ffffff);
+}
+
+.render-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+  background: var(--bg-secondary, #f5f5f5);
+}
+
+.dark-theme .render-modal-header {
+  background: var(--bg-secondary, #2a2a2a);
+  border-bottom-color: #444;
+}
+
+.render-modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.format-toggle {
+  display: flex;
+  gap: 4px;
+  margin-right: 16px;
+}
+
+.format-btn {
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--border-color, #ccc);
+  background: white;
+  color: #333;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.format-btn:hover {
+  background: #f0f0f0;
+}
+
+.format-btn.active {
+  background: #0066cc;
+  color: white;
+  border-color: #0066cc;
+}
+
+.dark-theme .format-btn {
+  background: #3a3a3a;
+  color: #ccc;
+  border-color: #555;
+}
+
+.dark-theme .format-btn:hover {
+  background: #4a4a4a;
+}
+
+.dark-theme .format-btn.active {
+  background: #0066cc;
+  border-color: #0066cc;
+}
+
+/* Body (scrollable output) */
+.render-modal-body {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  background: var(--bg-primary, #ffffff);
+}
+
+.dark-theme .render-modal-body {
+  background: var(--bg-primary, #1a1a1a);
+}
+
+.render-output {
+  margin: 0;
+  padding: 12px;
+  background: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #333;
+}
+
+.dark-theme .render-output {
+  background: #2a2a2a;
+  border-color: #444;
+  color: #e0e0e0;
+}
+
+/* Loading state */
+.render-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #0066cc;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.dark-theme .spinner {
+  border-color: #555;
+  border-top-color: #0066cc;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.render-loading p {
+  margin: 0;
+  color: var(--text-secondary, #666);
+  font-size: 14px;
+}
+
+/* Error state */
+.render-error {
+  padding: 16px;
+  background: #fee;
+  border: 1px solid #fcc;
+  border-radius: 4px;
+}
+
+.dark-theme .render-error {
+  background: #3a2a2a;
+  border-color: #664;
+  color: #f8a;
+}
+
+.error-title {
+  margin: 0 0 8px 0;
+  font-weight: 600;
+  color: #c33;
+}
+
+.dark-theme .error-title {
+  color: #f66;
+}
+
+.error-message {
+  margin: 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+  font-size: 12px;
+  overflow-x: auto;
+}
+
+.dark-theme .error-message {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Footer */
+.render-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid var(--border-color, #e0e0e0);
+  background: var(--bg-secondary, #f5f5f5);
+}
+
+.dark-theme .render-modal-footer {
+  background: var(--bg-secondary, #2a2a2a);
+  border-top-color: #444;
+}
+
+.render-modal-footer .btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .render-modal {
+    width: 95%;
+    height: 90vh;
+    max-height: 90vh;
+  }
+
+  .format-toggle {
+    margin-right: 8px;
+  }
+
+  .format-btn {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+}

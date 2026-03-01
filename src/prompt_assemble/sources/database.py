@@ -74,11 +74,8 @@ class DatabaseSource(PromptSource):
         """Ensure database schema exists."""
         cursor = self.connection.cursor()
         try:
-            # Check if tables exist by trying to query them
-            cursor.execute(f"SELECT 1 FROM {self._table('prompts')} LIMIT 1")
-        except Exception:
-            # Tables don't exist, rollback failed transaction and create them
-            self.connection.rollback()
+            # Always try to create all tables - CREATE TABLE IF NOT EXISTS is safe
+            logger.info("Creating/verifying prompts table...")
             cursor.execute(
                 f"""
                 CREATE TABLE IF NOT EXISTS {self._table('prompts')} (
@@ -131,7 +128,8 @@ class DatabaseSource(PromptSource):
                 """
             )
 
-            # Variable Sets tables
+            # Variable Sets tables - these might not exist in older databases
+            logger.info("Creating/verifying variable_sets table...")
             cursor.execute(
                 f"""
                 CREATE TABLE IF NOT EXISTS {self._table('variable_sets')} (
@@ -142,6 +140,7 @@ class DatabaseSource(PromptSource):
                 )
                 """
             )
+            logger.info("variable_sets table created/verified")
 
             cursor.execute(
                 f"""
@@ -192,8 +191,13 @@ class DatabaseSource(PromptSource):
             )
 
             self.connection.commit()
-
-        cursor.close()
+            logger.info("✓ Database schema successfully created/verified")
+        except Exception as e:
+            self.connection.rollback()
+            logger.error(f"ERROR ensuring schema: {e}")
+            raise
+        finally:
+            cursor.close()
 
     def refresh(self) -> None:
         """Refresh metadata from database (not content)."""
