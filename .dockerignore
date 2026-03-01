@@ -36,9 +36,10 @@ build/
 .travis.yml
 azure-pipelines.yml
 
-# Documentation
+# Documentation (keep README.md and LICENSE for build)
 docs/
-*.md
+CONTRIBUTING.md
+CHANGELOG.md
 
 # Tests
 tests/
