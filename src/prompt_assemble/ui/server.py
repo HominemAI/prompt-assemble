@@ -81,6 +81,11 @@ def create_app(source=None, config=None):
         """Serve static assets (JS, CSS, etc.)"""
         return app.send_static_file(f"assets/{filename}")
 
+    @app.route("/logos/<path:filename>")
+    def serve_logos(filename):
+        """Serve logo files"""
+        return app.send_static_file(f"logos/{filename}")
+
     # ====== API Routes ======
 
     @app.route("/api/prompts", methods=["GET"])
