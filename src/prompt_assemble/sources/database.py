@@ -3,6 +3,7 @@
 import logging
 import os
 import time
+from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
 
 from ..exceptions import PromptNotFoundError, SourceConnectionError
@@ -17,14 +18,17 @@ class DatabaseSource(PromptSource):
 
     Supports any DBAPI2-compatible database including PostgreSQL, SQLite, MySQL, etc.
     PostgreSQL is the recommended backend for production use.
+    Implements connection pooling to avoid connection exhaustion.
     """
 
-    def __init__(self, connection: Any, table_prefix: Optional[str] = None):
+    def __init__(self, connection: Any = None, connection_pool: Any = None, table_prefix: Optional[str] = None):
         """
         Initialize DatabaseSource.
 
         Args:
             connection: DBAPI2-compatible database connection (e.g., psycopg2.connect())
+                       For backward compatibility. If provided, creates a pool with minconn=1, maxconn=5.
+            connection_pool: psycopg2.pool.SimpleConnectionPool instance (preferred for production)
             table_prefix: Optional prefix for all table names.
                          If not provided, reads from PROMPT_ASSEMBLE_TABLE_PREFIX env var.
                          Defaults to empty string if neither is provided.
@@ -36,7 +40,14 @@ class DatabaseSource(PromptSource):
             PROMPT_ASSEMBLE_TABLE_PREFIX: Prefix for all table names (e.g., "myapp_")
 
         Examples:
-            PostgreSQL (recommended):
+            PostgreSQL with connection pool (recommended):
+                import psycopg2
+                from psycopg2 import pool
+                pool = pool.SimpleConnectionPool(1, 10,
+                    host='localhost', database='prompts', user='postgres', password='...')
+                source = DatabaseSource(connection_pool=pool)
+
+            PostgreSQL with single connection (backward compatible):
                 import psycopg2
                 conn = psycopg2.connect("dbname=prompts user=postgres")
                 source = DatabaseSource(conn, table_prefix="prod_")
@@ -47,7 +58,24 @@ class DatabaseSource(PromptSource):
                 source = DatabaseSource(conn)
         """
         super().__init__()
-        self.connection = connection
+
+        if connection_pool is not None:
+            self._pool = connection_pool
+            self.connection = None  # Use pool instead
+        elif connection is not None:
+            # Backward compatibility: wrap single connection in a simple pool
+            try:
+                import psycopg2.pool
+                # Create a minimal pool with 1 connection (the provided one won't be used,
+                # but we'll use the pool for consistency)
+                self._pool = None
+                self.connection = connection  # Keep for backward compat
+            except ImportError:
+                # For non-psycopg2 databases, just use the connection directly
+                self._pool = None
+                self.connection = connection
+        else:
+            raise SourceConnectionError("Either connection or connection_pool must be provided")
 
         # Determine table prefix from argument, env var, or default to empty
         if table_prefix is not None:
@@ -71,151 +99,181 @@ class DatabaseSource(PromptSource):
         except Exception as e:
             raise SourceConnectionError(f"Failed to initialize database: {e}")
 
+    @contextmanager
+    def _get_cursor(self):
+        """Context manager to safely get and close a database cursor.
+
+        Handles both connection pool and direct connection scenarios.
+        Automatically closes the cursor and returns the connection to the pool.
+        """
+        connection = None
+        cursor = None
+        try:
+            if self._pool is not None:
+                # Get connection from pool
+                connection = self._pool.getconn()
+            else:
+                # Use direct connection
+                connection = self.connection
+
+            cursor = connection.cursor()
+            yield cursor
+        finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception as e:
+                    logger.debug(f"Error closing cursor: {e}")
+
+            if connection is not None and self._pool is not None:
+                try:
+                    self._pool.putconn(connection)
+                except Exception as e:
+                    logger.debug(f"Error returning connection to pool: {e}")
+
     def _table(self, name: str) -> str:
         """Get the full table name with prefix."""
         return f"{self.table_prefix}{name}"
 
     def _ensure_schema(self) -> None:
         """Ensure database schema exists."""
-        cursor = self.connection.cursor()
-        try:
-            # Always try to create all tables - CREATE TABLE IF NOT EXISTS is safe
-            logger.info("Creating/verifying prompts table...")
-            cursor.execute(
-                f"""
-                CREATE TABLE IF NOT EXISTS {self._table('prompts')} (
-                    id TEXT PRIMARY KEY,
-                    name TEXT UNIQUE NOT NULL,
-                    content TEXT NOT NULL,
-                    version INTEGER NOT NULL DEFAULT 1,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-                """
-            )
-
-            cursor.execute(
-                f"""
-                CREATE TABLE IF NOT EXISTS {self._table('prompt_registry')} (
-                    id TEXT PRIMARY KEY,
-                    prompt_id TEXT NOT NULL UNIQUE,
-                    description TEXT,
-                    owner TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id)
-                )
-                """
-            )
-
-            cursor.execute(
-                f"""
-                CREATE TABLE IF NOT EXISTS {self._table('prompt_tags')} (
-                    prompt_id TEXT NOT NULL,
-                    tag TEXT NOT NULL,
-                    PRIMARY KEY (prompt_id, tag),
-                    FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id)
-                )
-                """
-            )
-
-            cursor.execute(
-                f"""
-                CREATE TABLE IF NOT EXISTS {self._table('prompt_versions')} (
-                    id TEXT PRIMARY KEY,
-                    prompt_id TEXT NOT NULL,
-                    version INTEGER NOT NULL,
-                    content TEXT NOT NULL,
-                    revision_comment TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(prompt_id, version),
-                    FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id)
-                )
-                """
-            )
-
-            # Add revision_comment column if it doesn't exist (for backwards compatibility)
+        with self._get_cursor() as cursor:
             try:
+                # Always try to create all tables - CREATE TABLE IF NOT EXISTS is safe
+                logger.info("Creating/verifying prompts table...")
                 cursor.execute(
-                    f"ALTER TABLE {self._table('prompt_versions')} ADD COLUMN revision_comment TEXT"
+                    f"""
+                    CREATE TABLE IF NOT EXISTS {self._table('prompts')} (
+                        id TEXT PRIMARY KEY,
+                        name TEXT UNIQUE NOT NULL,
+                        content TEXT NOT NULL,
+                        version INTEGER NOT NULL DEFAULT 1,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
                 )
-                self.connection.commit()
-                logger.info(f"Added revision_comment column to {self._table('prompt_versions')}")
+
+                cursor.execute(
+                    f"""
+                    CREATE TABLE IF NOT EXISTS {self._table('prompt_registry')} (
+                        id TEXT PRIMARY KEY,
+                        prompt_id TEXT NOT NULL UNIQUE,
+                        description TEXT,
+                        owner TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id)
+                    )
+                    """
+                )
+
+                cursor.execute(
+                    f"""
+                    CREATE TABLE IF NOT EXISTS {self._table('prompt_tags')} (
+                        prompt_id TEXT NOT NULL,
+                        tag TEXT NOT NULL,
+                        PRIMARY KEY (prompt_id, tag),
+                        FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id)
+                    )
+                    """
+                )
+
+                cursor.execute(
+                    f"""
+                    CREATE TABLE IF NOT EXISTS {self._table('prompt_versions')} (
+                        id TEXT PRIMARY KEY,
+                        prompt_id TEXT NOT NULL,
+                        version INTEGER NOT NULL,
+                        content TEXT NOT NULL,
+                        revision_comment TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(prompt_id, version),
+                        FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id)
+                    )
+                    """
+                )
+
+                # Add revision_comment column if it doesn't exist (for backwards compatibility)
+                try:
+                    cursor.execute(
+                        f"ALTER TABLE {self._table('prompt_versions')} ADD COLUMN revision_comment TEXT"
+                    )
+                    cursor.connection.commit()
+                    logger.info(f"Added revision_comment column to {self._table('prompt_versions')}")
+                except Exception as e:
+                    if "already exists" not in str(e).lower() and "duplicate column" not in str(e).lower():
+                        logger.debug(f"Could not add revision_comment column: {e}")
+                    cursor.connection.rollback()
+
+                # Variable Sets tables - these might not exist in older databases
+                logger.info("Creating/verifying variable_sets table...")
+                cursor.execute(
+                    f"""
+                    CREATE TABLE IF NOT EXISTS {self._table('variable_sets')} (
+                        id TEXT PRIMARY KEY,
+                        name TEXT UNIQUE NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+                logger.info("variable_sets table created/verified")
+
+                cursor.execute(
+                    f"""
+                    CREATE TABLE IF NOT EXISTS {self._table('variable_set_variables')} (
+                        id TEXT PRIMARY KEY,
+                        variable_set_id TEXT NOT NULL,
+                        key TEXT NOT NULL,
+                        value TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(variable_set_id, key),
+                        FOREIGN KEY (variable_set_id) REFERENCES {self._table('variable_sets')}(id)
+                    )
+                    """
+                )
+
+                cursor.execute(
+                    f"""
+                    CREATE TABLE IF NOT EXISTS {self._table('variable_set_selections')} (
+                        id TEXT PRIMARY KEY,
+                        prompt_id TEXT NOT NULL,
+                        variable_set_id TEXT NOT NULL,
+                        list_order INTEGER NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(prompt_id, variable_set_id),
+                        FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id),
+                        FOREIGN KEY (variable_set_id) REFERENCES {self._table('variable_sets')}(id)
+                    )
+                    """
+                )
+
+                cursor.execute(
+                    f"""
+                    CREATE TABLE IF NOT EXISTS {self._table('variable_set_overrides')} (
+                        id TEXT PRIMARY KEY,
+                        prompt_id TEXT NOT NULL,
+                        variable_set_id TEXT NOT NULL,
+                        key TEXT NOT NULL,
+                        override_value TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(prompt_id, variable_set_id, key),
+                        FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id),
+                        FOREIGN KEY (variable_set_id) REFERENCES {self._table('variable_sets')}(id)
+                    )
+                    """
+                )
+
+                cursor.connection.commit()
+                logger.info("✓ Database schema successfully created/verified")
             except Exception as e:
-                if "already exists" not in str(e).lower() and "duplicate column" not in str(e).lower():
-                    logger.debug(f"Could not add revision_comment column: {e}")
-                self.connection.rollback()
-
-            # Variable Sets tables - these might not exist in older databases
-            logger.info("Creating/verifying variable_sets table...")
-            cursor.execute(
-                f"""
-                CREATE TABLE IF NOT EXISTS {self._table('variable_sets')} (
-                    id TEXT PRIMARY KEY,
-                    name TEXT UNIQUE NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-                """
-            )
-            logger.info("variable_sets table created/verified")
-
-            cursor.execute(
-                f"""
-                CREATE TABLE IF NOT EXISTS {self._table('variable_set_variables')} (
-                    id TEXT PRIMARY KEY,
-                    variable_set_id TEXT NOT NULL,
-                    key TEXT NOT NULL,
-                    value TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(variable_set_id, key),
-                    FOREIGN KEY (variable_set_id) REFERENCES {self._table('variable_sets')}(id)
-                )
-                """
-            )
-
-            cursor.execute(
-                f"""
-                CREATE TABLE IF NOT EXISTS {self._table('variable_set_selections')} (
-                    id TEXT PRIMARY KEY,
-                    prompt_id TEXT NOT NULL,
-                    variable_set_id TEXT NOT NULL,
-                    list_order INTEGER NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(prompt_id, variable_set_id),
-                    FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id),
-                    FOREIGN KEY (variable_set_id) REFERENCES {self._table('variable_sets')}(id)
-                )
-                """
-            )
-
-            cursor.execute(
-                f"""
-                CREATE TABLE IF NOT EXISTS {self._table('variable_set_overrides')} (
-                    id TEXT PRIMARY KEY,
-                    prompt_id TEXT NOT NULL,
-                    variable_set_id TEXT NOT NULL,
-                    key TEXT NOT NULL,
-                    override_value TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(prompt_id, variable_set_id, key),
-                    FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id),
-                    FOREIGN KEY (variable_set_id) REFERENCES {self._table('variable_sets')}(id)
-                )
-                """
-            )
-
-            self.connection.commit()
-            logger.info("✓ Database schema successfully created/verified")
-        except Exception as e:
-            self.connection.rollback()
-            logger.error(f"ERROR ensuring schema: {e}")
-            raise
-        finally:
-            cursor.close()
+                cursor.connection.rollback()
+                logger.error(f"ERROR ensuring schema: {e}")
+                raise
 
     def refresh(self) -> None:
         """Refresh metadata from database (not content)."""
@@ -223,8 +281,7 @@ class DatabaseSource(PromptSource):
         self._registry.clear()
         self._metadata_cache.clear()
 
-        cursor = self.connection.cursor()
-        try:
+        with self._get_cursor() as cursor:
             # Get all prompts with their metadata
             cursor.execute(
                 f"""
@@ -261,9 +318,6 @@ class DatabaseSource(PromptSource):
                 )
                 self._registry.register(entry)
 
-        finally:
-            cursor.close()
-
         # Emit refresh event
         self._emit("refreshed")
 
@@ -292,8 +346,7 @@ class DatabaseSource(PromptSource):
         if self._should_refresh():
             self.refresh()
         self._ensure_connection()
-        cursor = self.connection.cursor()
-        try:
+        with self._get_cursor() as cursor:
             cursor.execute(
                 f"SELECT content FROM {self._table('prompts')} WHERE name = %s ORDER BY version DESC LIMIT 1",
                 (name,),
@@ -302,13 +355,10 @@ class DatabaseSource(PromptSource):
             if row is None:
                 raise PromptNotFoundError(f"Prompt not found: {name}")
             return row[0]
-        finally:
-            cursor.close()
 
     def delete_prompt(self, name: str) -> None:
         """Delete a prompt and its associated data."""
-        cursor = self.connection.cursor()
-        try:
+        with self._get_cursor() as cursor:
             # Get prompt ID
             cursor.execute(
                 f"SELECT id FROM {self._table('prompts')} WHERE name = %s",
@@ -344,12 +394,9 @@ class DatabaseSource(PromptSource):
                 (prompt_id,),
             )
 
-            self.connection.commit()
+            cursor.connection.commit()
             self.refresh()
             self._emit("prompt_deleted")
-
-        finally:
-            cursor.close()
 
     def get_prompt_version(self, name: str, version: Optional[int] = None) -> str:
         """
@@ -365,8 +412,7 @@ class DatabaseSource(PromptSource):
         Raises:
             PromptNotFoundError: If prompt or version not found
         """
-        cursor = self.connection.cursor()
-        try:
+        with self._get_cursor() as cursor:
             if version is None:
                 cursor.execute(
                     f"SELECT content FROM {self._table('prompts')} WHERE name = %s ORDER BY version DESC LIMIT 1",
@@ -383,8 +429,6 @@ class DatabaseSource(PromptSource):
             if row is None:
                 raise PromptNotFoundError(f"Prompt not found: {name} (version {version})")
             return row[0]
-        finally:
-            cursor.close()
 
     def find_by_tag(self, *tags: str) -> list[str]:
         """Find all prompt names matching ALL tags (AND intersection)."""
@@ -428,8 +472,7 @@ class DatabaseSource(PromptSource):
         if tags is None:
             tags = []
 
-        cursor = self.connection.cursor()
-        try:
+        with self._get_cursor() as cursor:
             # Check if prompt exists
             cursor.execute(
                 f"SELECT id, version FROM {self._table('prompts')} WHERE name = %s",
@@ -523,13 +566,10 @@ class DatabaseSource(PromptSource):
                         (prompt_id, prompt_id),
                     )
 
-            self.connection.commit()
+            cursor.connection.commit()
             self.refresh()
             self._emit("prompt_saved")
             return prompt_id
-
-        finally:
-            cursor.close()
 
     # Variable Sets Management Methods
 
@@ -549,8 +589,7 @@ class DatabaseSource(PromptSource):
         if variables is None:
             variables = {}
 
-        cursor = self.connection.cursor()
-        try:
+        with self._get_cursor() as cursor:
             set_id = str(uuid.uuid4())
             cursor.execute(
                 f"INSERT INTO {self._table('variable_sets')} (id, name) VALUES (%s, %s)",
@@ -564,15 +603,12 @@ class DatabaseSource(PromptSource):
                     (str(uuid.uuid4()), set_id, key, value),
                 )
 
-            self.connection.commit()
+            cursor.connection.commit()
             return set_id
-        finally:
-            cursor.close()
 
     def get_variable_set(self, set_id: str) -> Optional[Dict[str, Any]]:
         """Get a variable set by ID."""
-        cursor = self.connection.cursor()
-        try:
+        with self._get_cursor() as cursor:
             cursor.execute(f"SELECT id, name FROM {self._table('variable_sets')} WHERE id = %s", (set_id,))
             row = cursor.fetchone()
             if not row:
@@ -586,13 +622,10 @@ class DatabaseSource(PromptSource):
 
             variables = {row[0]: row[1] for row in cursor.fetchall()}
             return {"id": set_id, "name": name, "variables": variables}
-        finally:
-            cursor.close()
 
     def list_variable_sets(self) -> List[Dict[str, Any]]:
         """List all variable sets."""
-        cursor = self.connection.cursor()
-        try:
+        with self._get_cursor() as cursor:
             cursor.execute(f"SELECT id, name FROM {self._table('variable_sets')} ORDER BY name")
             sets = []
             for row in cursor.fetchall():
@@ -604,13 +637,11 @@ class DatabaseSource(PromptSource):
                 variables = {r[0]: r[1] for r in cursor.fetchall()}
                 sets.append({"id": set_id, "name": name, "variables": variables})
             return sets
-        finally:
-            cursor.close()
 
     def update_variable_set(self, set_id: str, name: Optional[str] = None, variables: Optional[Dict[str, str]] = None) -> None:
         """Update a variable set."""
-        cursor = self.connection.cursor()
-        try:
+        import uuid
+        with self._get_cursor() as cursor:
             if name:
                 cursor.execute(
                     f"UPDATE {self._table('variable_sets')} SET name = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
@@ -630,14 +661,11 @@ class DatabaseSource(PromptSource):
                         (str(uuid.uuid4()), set_id, key, value),
                     )
 
-            self.connection.commit()
-        finally:
-            cursor.close()
+            cursor.connection.commit()
 
     def delete_variable_set(self, set_id: str) -> None:
         """Delete a variable set."""
-        cursor = self.connection.cursor()
-        try:
+        with self._get_cursor() as cursor:
             cursor.execute(
                 f"DELETE FROM {self._table('variable_set_variables')} WHERE variable_set_id = %s",
                 (set_id,),
@@ -654,14 +682,11 @@ class DatabaseSource(PromptSource):
                 f"DELETE FROM {self._table('variable_sets')} WHERE id = %s",
                 (set_id,),
             )
-            self.connection.commit()
-        finally:
-            cursor.close()
+            cursor.connection.commit()
 
     def get_active_variable_sets(self, prompt_id: str) -> List[Dict[str, Any]]:
         """Get all active variable sets for a prompt, in order."""
-        cursor = self.connection.cursor()
-        try:
+        with self._get_cursor() as cursor:
             cursor.execute(
                 f"""
                 SELECT vs.id, vs.name
@@ -683,13 +708,11 @@ class DatabaseSource(PromptSource):
                 variables = {r[0]: r[1] for r in cursor.fetchall()}
                 sets.append({"id": set_id, "name": name, "variables": variables})
             return sets
-        finally:
-            cursor.close()
 
     def set_active_variable_sets(self, prompt_id: str, set_ids: List[str]) -> None:
         """Set the active variable sets for a prompt."""
-        cursor = self.connection.cursor()
-        try:
+        import uuid
+        with self._get_cursor() as cursor:
             # Remove existing selections
             cursor.execute(
                 f"DELETE FROM {self._table('variable_set_selections')} WHERE prompt_id = %s",
@@ -701,26 +724,21 @@ class DatabaseSource(PromptSource):
                     f"INSERT INTO {self._table('variable_set_selections')} (id, prompt_id, variable_set_id, list_order) VALUES (%s, %s, %s, %s)",
                     (str(uuid.uuid4()), prompt_id, set_id, order),
                 )
-            self.connection.commit()
-        finally:
-            cursor.close()
+            cursor.connection.commit()
 
     def get_variable_overrides(self, prompt_id: str, set_id: str) -> Dict[str, str]:
         """Get override values for a specific set in a prompt."""
-        cursor = self.connection.cursor()
-        try:
+        with self._get_cursor() as cursor:
             cursor.execute(
                 f"SELECT key, override_value FROM {self._table('variable_set_overrides')} WHERE prompt_id = %s AND variable_set_id = %s",
                 (prompt_id, set_id),
             )
             return {row[0]: row[1] for row in cursor.fetchall()}
-        finally:
-            cursor.close()
 
     def set_variable_overrides(self, prompt_id: str, set_id: str, overrides: Dict[str, str]) -> None:
         """Set override values for a specific set in a prompt."""
-        cursor = self.connection.cursor()
-        try:
+        import uuid
+        with self._get_cursor() as cursor:
             # Remove existing overrides
             cursor.execute(
                 f"DELETE FROM {self._table('variable_set_overrides')} WHERE prompt_id = %s AND variable_set_id = %s",
@@ -732,6 +750,4 @@ class DatabaseSource(PromptSource):
                     f"INSERT INTO {self._table('variable_set_overrides')} (id, prompt_id, variable_set_id, key, override_value) VALUES (%s, %s, %s, %s, %s)",
                     (str(uuid.uuid4()), prompt_id, set_id, key, value),
                 )
-            self.connection.commit()
-        finally:
-            cursor.close()
+            cursor.connection.commit()

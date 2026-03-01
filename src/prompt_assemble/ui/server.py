@@ -277,6 +277,7 @@ def create_app(source=None, config=None):
         if not hasattr(app.prompt_source, 'connection'):
             return jsonify({"variableSetIds": [], "overrides": {}}), 200
 
+        cursor = None
         try:
             cursor = app.prompt_source.connection.cursor()
             table_prefix = getattr(app.prompt_source, 'table_prefix', '')
@@ -311,11 +312,16 @@ def create_app(source=None, config=None):
                     overrides[var_set_id] = {}
                 overrides[var_set_id][key] = value
 
-            cursor.close()
             return jsonify({"variableSetIds": variable_set_ids, "overrides": overrides}), 200
         except Exception as e:
             logger.error(f"Error getting variable sets for {name}: {e}")
             return jsonify({"variableSetIds": [], "overrides": {}}), 200
+        finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception as e:
+                    logger.debug(f"Error closing cursor: {e}")
 
     @app.route("/api/prompts/<name>/variable-sets", methods=["POST"])
     def save_prompt_variable_sets(name):
@@ -323,6 +329,7 @@ def create_app(source=None, config=None):
         if not hasattr(app.prompt_source, 'connection'):
             return jsonify({"error": "Database source not available"}), 400
 
+        cursor = None
         try:
             data = request.json
             variable_set_ids = data.get("variableSetIds", [])
@@ -370,13 +377,20 @@ def create_app(source=None, config=None):
                     )
 
             app.prompt_source.connection.commit()
-            cursor.close()
-
             return jsonify({"success": True, "name": name}), 200
         except Exception as e:
             logger.error(f"Error saving variable sets for {name}: {e}")
-            app.prompt_source.connection.rollback()
+            try:
+                app.prompt_source.connection.rollback()
+            except:
+                pass
             return jsonify({"error": str(e)}), 500
+        finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception as e:
+                    logger.debug(f"Error closing cursor: {e}")
 
     @app.route("/api/prompts/<name>/revert/<int:version>", methods=["POST"])
     def revert_prompt(name, version):
@@ -384,6 +398,7 @@ def create_app(source=None, config=None):
         if not hasattr(app.prompt_source, 'connection'):
             return jsonify({"error": "Database not available"}), 500
 
+        cursor = None
         try:
             cursor = app.prompt_source.connection.cursor()
             table_prefix = getattr(app.prompt_source, 'table_prefix', '')
@@ -433,7 +448,6 @@ def create_app(source=None, config=None):
             )
 
             app.prompt_source.connection.commit()
-            cursor.close()
 
             logger.info(f"[revert_prompt] Successfully reverted {name} to version {version} (new version: {new_version})")
             return jsonify({
@@ -447,9 +461,18 @@ def create_app(source=None, config=None):
 
         except Exception as e:
             logger.error(f"[revert_prompt] Error reverting {name} to version {version}: {e}", exc_info=True)
-            if hasattr(app.prompt_source, 'connection'):
-                app.prompt_source.connection.rollback()
+            try:
+                if hasattr(app.prompt_source, 'connection'):
+                    app.prompt_source.connection.rollback()
+            except:
+                pass
             return jsonify({"error": str(e)}), 500
+        finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception as e:
+                    logger.debug(f"Error closing cursor: {e}")
 
     @app.route("/api/prompts/<name>/history", methods=["GET"])
     def get_prompt_history(name):
@@ -458,6 +481,7 @@ def create_app(source=None, config=None):
             logger.debug(f"[get_prompt_history] No database connection for {name}")
             return jsonify({"versions": []}), 200
 
+        cursor = None
         try:
             import uuid
             cursor = app.prompt_source.connection.cursor()
@@ -513,11 +537,16 @@ def create_app(source=None, config=None):
                     "revisionComment": revision_comment or ""
                 })
 
-            cursor.close()
             return jsonify({"versions": versions}), 200
         except Exception as e:
             logger.error(f"[get_prompt_history] Error getting version history for {name}: {e}", exc_info=True)
             return jsonify({"error": str(e)}), 500
+        finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception as e:
+                    logger.debug(f"Error closing cursor: {e}")
 
     @app.route("/api/tags", methods=["GET"])
     def list_tags():
@@ -548,6 +577,7 @@ def create_app(source=None, config=None):
     @app.route("/api/variable-sets", methods=["GET"])
     def list_variable_sets():
         """List all available variable sets."""
+        cursor = None
         try:
             # Check if source is database-backed and has connection
             if not hasattr(app.prompt_source, 'connection'):
@@ -600,10 +630,17 @@ def create_app(source=None, config=None):
         except Exception as e:
             logger.error(f"Error listing variable sets: {e}")
             return jsonify({"error": str(e)}), 500
+        finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception as e:
+                    logger.debug(f"Error closing cursor: {e}")
 
     @app.route("/api/variable-sets", methods=["POST"])
     def create_variable_set():
         """Create or update a variable set."""
+        cursor = None
         try:
             if not hasattr(app.prompt_source, 'connection'):
                 return jsonify({"error": "Database not available"}), 500
@@ -663,10 +700,17 @@ def create_app(source=None, config=None):
         except Exception as e:
             logger.error(f"Error creating variable set: {e}")
             return jsonify({"error": str(e)}), 500
+        finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception as e:
+                    logger.debug(f"Error closing cursor: {e}")
 
     @app.route("/api/variable-sets/<set_id>", methods=["DELETE"])
     def delete_variable_set(set_id):
         """Delete a variable set."""
+        cursor = None
         try:
             if not hasattr(app.prompt_source, 'connection'):
                 return jsonify({"error": "Database not available"}), 500
@@ -694,6 +738,12 @@ def create_app(source=None, config=None):
         except Exception as e:
             logger.error(f"Error deleting variable set: {e}")
             return jsonify({"error": str(e)}), 500
+        finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception as e:
+                    logger.debug(f"Error closing cursor: {e}")
 
     @app.route("/api/export", methods=["POST"])
     def export_prompts():
