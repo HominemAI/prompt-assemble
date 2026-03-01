@@ -104,15 +104,22 @@ def create_app(source=None, config=None):
             # Pre-fetch all timestamps if using database source (avoid N+1 queries)
             timestamps = {}
             if hasattr(app.prompt_source, 'connection'):
-                cursor = app.prompt_source.connection.cursor()
                 try:
-                    cursor.execute(f"SELECT name, updated_at FROM {app.prompt_source._table('prompts')}")
-                    rows = cursor.fetchall()
-                    logger.info(f"[list_prompts] Fetched {len(rows)} timestamps from database")
-                    for row in rows:
-                        timestamps[row[0]] = row[1]
-                finally:
-                    cursor.close()
+                    logger.info("[list_prompts] Attempting to fetch timestamps from database")
+                    cursor = app.prompt_source.connection.cursor()
+                    try:
+                        cursor.execute(f"SELECT name, updated_at FROM {app.prompt_source._table('prompts')}")
+                        rows = cursor.fetchall()
+                        logger.info(f"[list_prompts] Fetched {len(rows)} timestamps from database")
+                        for row in rows:
+                            timestamps[row[0]] = row[1]
+                    finally:
+                        cursor.close()
+                except Exception as db_error:
+                    logger.error(f"[list_prompts] DATABASE ERROR: Failed to fetch timestamps from database: {type(db_error).__name__}: {db_error}")
+                    logger.error(f"[list_prompts] Database connection details: {app.prompt_source.connection if hasattr(app.prompt_source, 'connection') else 'No connection object'}")
+                    # Continue without timestamps rather than failing completely
+                    logger.warning("[list_prompts] Proceeding without database timestamps")
 
             prompts = []
             skipped_count = 0
@@ -133,7 +140,7 @@ def create_app(source=None, config=None):
 
             return jsonify({"prompts": prompts})
         except Exception as e:
-            logger.error(f"Error listing prompts: {e}")
+            logger.error(f"Error listing prompts: {type(e).__name__}: {e}", exc_info=True)
             return jsonify({"error": str(e)}), 500
 
     @app.route("/api/prompts/search", methods=["GET"])
@@ -520,13 +527,22 @@ def create_app(source=None, config=None):
 
         try:
             tags = set()
-            for name in app.prompt_source.list():
-                metadata = _get_prompt_metadata(app.prompt_source, name)
-                tags.update(metadata.get("tags", []))
+            all_prompts = app.prompt_source.list()
+            logger.info(f"[list_tags] Processing {len(all_prompts)} prompts to gather tags")
 
+            for name in all_prompts:
+                try:
+                    metadata = _get_prompt_metadata(app.prompt_source, name)
+                    tags.update(metadata.get("tags", []))
+                except Exception as metadata_error:
+                    logger.error(f"[list_tags] DATABASE ERROR getting metadata for '{name}': {type(metadata_error).__name__}: {metadata_error}")
+                    # Continue with other prompts rather than failing completely
+                    continue
+
+            logger.info(f"[list_tags] Successfully gathered {len(tags)} unique tags")
             return jsonify({"tags": sorted(list(tags))})
         except Exception as e:
-            logger.error(f"Error listing tags: {e}")
+            logger.error(f"[list_tags] Error listing tags: {type(e).__name__}: {e}", exc_info=True)
             return jsonify({"error": str(e)}), 500
 
     @app.route("/api/variable-sets", methods=["GET"])
@@ -802,10 +818,15 @@ def run_server(
     if source is None and os.getenv("DB_HOSTNAME"):
         try:
             from ..sources import create_database_source_from_env
-            logger.info("Auto-creating DatabaseSource from environment variables")
+            db_hostname = os.getenv("DB_HOSTNAME")
+            db_port = os.getenv("DB_PORT", "5432")
+            db_name = os.getenv("DB_DATABASE", "prompts")
+            logger.info(f"Auto-creating DatabaseSource from environment: {db_hostname}:{db_port}/{db_name}")
             source = create_database_source_from_env()
+            logger.info("DatabaseSource created successfully")
         except Exception as e:
-            logger.warning(f"Could not auto-create DatabaseSource: {e}")
+            logger.error(f"DATABASE ERROR: Could not auto-create DatabaseSource: {type(e).__name__}: {e}")
+            logger.warning("Proceeding without database - this may cause API errors")
 
     # Determine port: command line arg > env var > default
     if port is None:
