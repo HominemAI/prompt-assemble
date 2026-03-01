@@ -1,0 +1,173 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    # Publish version tags as releases
+    tags: ['v*.*.*']
+    branches:
+      - main
+
+env:
+  # Use ghcr.io for GitHub Container Registry
+  REGISTRY: ghcr.io
+  # github.repository as <account>/<repo>
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Install the cosign tool except on PR
+      # https://github.com/sigstore/cosign-installer
+      - name: Install cosign
+        if: github.event_name != 'pull_request'
+        uses: sigstore/cosign-installer@v3.5.0
+        with:
+          cosign-release: 'v2.2.4'
+
+      - name: Check cosign install
+        run: cosign version
+
+      # Login against a Docker registry except on PR
+      # https://github.com/docker/login-action
+      - name: Log into registry ${{ env.REGISTRY }}
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Setup Docker Buildx
+      # https://github.com/docker/setup-buildx-action
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Extract metadata (tags, labels) for Docker
+      # https://github.com/docker/metadata-action
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # Build and push Docker image with Buildx
+      # https://github.com/docker/build-push-action
+      - name: Build and push Docker image
+        id: build-and-push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Sign the resulting Docker image digest except on PRs
+      # This will only write to the public Rekor transparency log when running outside of PRs
+      - name: Sign the published Docker image
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#about-oidc
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build-and-push.outputs.digest }}
+        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+
+  test:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log into registry ${{ env.REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Pull and test Docker image
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }} python -c "import prompt_assemble; print(f'prompt-assemble {prompt_assemble.__version__} loaded successfully')"
+
+  notify:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [build, test]
+    steps:
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          body: |
+            # Docker Image Published
+
+            Docker image has been built and published to GitHub Container Registry.
+
+            **Image:** `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}`
+            **Tag:** `${{ steps.version.outputs.VERSION }}`
+            **Pull Command:**
+            ```bash
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+            ```
+
+            ## Features
+
+            - Prompt assembly library with sigil-based substitution
+            - Web-based prompt management UI
+            - Multi-source support (filesystem, database)
+            - Advanced features:
+              - Tag-based prompt injection
+              - Auto-save and versioning
+              - Bookmark navigation
+              - Live autocomplete
+              - Export functionality
+
+            ## Environment Variables
+
+            - `PROMPT_ASSEMBLE_UI=true` - Enable web UI
+            - `FLASK_HOST=0.0.0.0` - Server host
+            - `FLASK_PORT=5000` - Server port
+            - `PROMPT_ASSEMBLE_TABLE_PREFIX=` - Database table prefix
+
+            ## Quick Start
+
+            ```bash
+            docker run -p 5000:5000 \\
+              -e PROMPT_ASSEMBLE_UI=true \\
+              -v prompts:/app/prompts \\
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+            ```
+
+            Open http://localhost:5000 in your browser.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

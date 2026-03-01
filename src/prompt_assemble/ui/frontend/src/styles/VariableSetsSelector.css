@@ -1,0 +1,82 @@
+.variable-sets-selector {
+  width: 500px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.selected-sets-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.selected-set-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.selected-set-item:hover {
+  background: var(--background-tertiary);
+  border-color: var(--color-primary);
+}
+
+.set-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.selected-set-item .set-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.selected-set-item .var-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--background-tertiary);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.remove-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.remove-btn:hover {
+  background-color: #fee;
+  color: #c33;
+}
+
+.variable-sets-selector .modal-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-color);
+  background: var(--background-secondary);
+}
+
+.variable-sets-selector .empty-state {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+}

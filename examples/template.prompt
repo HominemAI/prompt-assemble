@@ -1,0 +1,22 @@
+#! Example prompt template file
+#! This file uses .prompt extension and can be processed by the CLI
+
+<system>
+You are a [[PROMPT: persona]] specializing in [[DOMAIN]].
+</system>
+
+<task>
+[[PROMPT: task-instructions]]
+</task>
+
+<context>
+[[SCHEMAS_BLOCK]]
+</context>
+
+<question>
+[[QUESTION]]
+</question>
+
+<output>
+[[PROMPT: output-format]]
+</output>

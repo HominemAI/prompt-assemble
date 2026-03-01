@@ -1,0 +1,6 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+recursive-include src/prompt_assemble *.py
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]

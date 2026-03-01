@@ -1,0 +1,168 @@
+.editor-panel {
+  @apply flex flex-col flex-1 overflow-hidden bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100;
+}
+
+.bookmarks-bar {
+  @apply flex items-center gap-2 p-1.5 bg-slate-200 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex-shrink-0 overflow-x-auto text-xs;
+}
+
+.bookmarks-label {
+  @apply font-bold text-slate-600 dark:text-slate-400 flex-shrink-0;
+}
+
+.bookmark-btn {
+  @apply px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-xs cursor-pointer transition-colors text-slate-900 dark:text-slate-100 flex-shrink-0 hover:bg-slate-100 dark:hover:bg-slate-800;
+}
+
+.prompt-id-label {
+  @apply font-semibold text-slate-900 dark:text-slate-100 px-2 py-0.5 bg-blue-100 dark:bg-blue-900 rounded text-xs flex-shrink-0 mr-2;
+}
+
+.token-count-inline {
+  @apply text-slate-600 dark:text-slate-400 font-mono flex-shrink-0 mr-2;
+}
+
+.editor-wrapper {
+  @apply flex-1 relative overflow-hidden;
+}
+
+.editor-codemirror {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+.editor-codemirror .cm-editor {
+  height: 100%;
+  font-size: 14px;
+  font-family: 'Courier New', monospace;
+  color: #f5f5f5 !important;
+}
+
+.dark .editor-codemirror .cm-editor {
+  color: #ffffff !important;
+}
+
+.editor-codemirror .cm-gutters {
+  background-color: #f8f9fa;
+  border-right: 1px solid #e5e7eb;
+}
+
+.dark .editor-codemirror .cm-gutters {
+  background-color: #1e293b;
+  border-right-color: #334155;
+}
+
+/* Custom token highlighting for prompt syntax */
+.cm-prompt-var {
+  color: #3b82f6 !important;
+  font-weight: 600 !important;
+}
+
+.cm-prompt-component {
+  color: #3b82f6 !important;
+  font-weight: 600 !important;
+}
+
+.cm-prompt-tag {
+  color: #3b82f6 !important;
+  font-weight: 600 !important;
+}
+
+.cm-prompt-comment {
+  color: #22c55e !important;
+  font-style: italic !important;
+}
+
+.cm-xml-tag {
+  color: #dc2626 !important;
+  font-weight: 500 !important;
+}
+
+.cm-prompt-name {
+  color: #a855f7 !important;
+  font-weight: 600 !important;
+}
+
+.dark .cm-prompt-var {
+  color: #60a5fa !important;
+}
+
+.dark .cm-prompt-component {
+  color: #60a5fa !important;
+}
+
+.dark .cm-prompt-tag {
+  color: #60a5fa !important;
+}
+
+.dark .cm-prompt-comment {
+  color: #4ade80 !important;
+}
+
+.dark .cm-xml-tag {
+  color: #fca5a5 !important;
+}
+
+.dark .cm-prompt-name {
+  color: #d946ef !important;
+}
+
+.editor-syntax-hints {
+  @apply absolute top-4 right-4 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded shadow-lg z-10 text-xs pointer-events-auto;
+}
+
+.hints-header {
+  @apply flex items-center justify-between px-3 py-2 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 rounded-t cursor-pointer;
+}
+
+.hints-header span {
+  @apply font-semibold text-slate-700 dark:text-slate-300;
+}
+
+.hints-toggle {
+  @apply p-0 bg-none border-none cursor-pointer text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors;
+}
+
+.hints-content {
+  @apply w-64 p-3 max-h-96 overflow-y-auto;
+}
+
+.hint {
+  @apply mb-1.5 text-slate-600 dark:text-slate-400 font-mono p-1 bg-slate-100 dark:bg-slate-800 border-l-2 border-l-blue-600 rounded-sm last:mb-0;
+}
+
+.editor-syntax-hints.collapsed {
+  @apply w-auto;
+}
+
+.editor-syntax-hints.collapsed .hints-header {
+  @apply rounded;
+}
+
+.autocomplete {
+  @apply fixed bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded shadow-lg z-50 max-h-80 overflow-y-auto min-w-64 text-slate-900 dark:text-slate-100;
+}
+
+.autocomplete-header {
+  @apply px-2 py-1.5 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1 font-medium sticky top-0;
+}
+
+.autocomplete-item {
+  @apply px-3 py-2 cursor-pointer text-sm font-mono transition-colors border-b border-slate-100 dark:border-slate-800 text-slate-900 dark:text-slate-100 hover:bg-blue-600 hover:text-white;
+}
+
+.autocomplete-item.selected {
+  @apply bg-blue-600 text-white;
+}
+
+.autocomplete-item:last-child {
+  @apply border-b-0;
+}
+
+.editor-status {
+  @apply flex gap-4 p-1.5 bg-slate-100 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400 flex-shrink-0;
+}
+
+.editor-status span {
+  @apply flex items-center gap-1;
+}

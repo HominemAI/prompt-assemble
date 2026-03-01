@@ -1,0 +1,20 @@
+# Core dependencies
+# (none required - prompt-assemble has no core dependencies)
+
+# Optional: Flask UI Server
+flask>=2.0
+flask-cors>=3.0
+
+# Optional: PostgreSQL Database Support
+psycopg2-binary>=2.9
+
+# Token counting
+tiktoken>=0.5.0
+
+# Development dependencies
+pytest>=7.0
+pytest-cov>=3.0
+black>=22.0
+isort>=5.0
+flake8>=4.0
+mypy>=0.950
