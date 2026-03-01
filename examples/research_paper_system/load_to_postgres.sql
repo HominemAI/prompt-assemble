@@ -2,7 +2,7 @@
 -- This script assumes the database schema is already created by DatabaseSource._ensure_schema()
 --
 -- Usage:
---   psql -U postgres -d prompts -f load_to_postgres.sql
+--   psql -U postgres -d pambl_prompts -f load_to_postgres.sql
 --
 -- Or with environment variables:
 --   psql -h $DB_HOSTNAME -U $DB_USERNAME -d $DB_DATABASE -f load_to_postgres.sql
@@ -11,9 +11,9 @@
 -- PART 1: INSERT PROMPTS
 -- ============================================================================
 
-INSERT INTO prompts (name, content, created_at, updated_at) VALUES
+INSERT INTO pambl_prompts (name, content, created_at, updated_at) VALUES
   ('research_paper_generator', '#! Research Paper Generator - Complete System
-#! This prompt demonstrates variable hierarchy, nested prompts, and tag-based injection
+#! This prompt demonstrates variable hierarchy, nested pambl_prompts, and tag-based injection
 
 <paper>
   <metadata>
@@ -391,21 +391,21 @@ ON CONFLICT (name) DO UPDATE SET
 -- PART 2: INSERT PROMPT REGISTRY ENTRIES (descriptions)
 -- ============================================================================
 
-INSERT INTO prompt_registry (prompt_id, description, owner, created_at, updated_at) VALUES
-  ((SELECT id FROM prompts WHERE name = 'research_paper_generator'), 'Main research paper generator that orchestrates all sections through nested prompts and tag-based injection', 'research-team', NOW(), NOW()),
-  ((SELECT id FROM prompts WHERE name = 'abstract_template'), 'Reusable abstract template used by research_paper_generator. Contains variable placeholders for subject, focus, and key findings.', 'research-team', NOW(), NOW()),
-  ((SELECT id FROM prompts WHERE name = 'research_instructions'), 'Guidelines for conducting research in the specified domain. Covers structure, methodology, and quality standards.', 'research-team', NOW(), NOW()),
-  ((SELECT id FROM prompts WHERE name = 'methodology_template'), 'Detailed methodology section template covering research design, participants, data collection, and analysis methods.', 'research-team', NOW(), NOW()),
-  ((SELECT id FROM prompts WHERE name = 'validation_checklist'), 'Validation checklist for research methodology. Ensures all quality and validation criteria are met before submission.', 'research-team', NOW(), NOW()),
-  ((SELECT id FROM prompts WHERE name = 'reference_guidelines'), 'Guidelines for formatting references and citations. Includes citation style requirements and authority level standards.', 'research-team', NOW(), NOW()),
-  ((SELECT id FROM prompts WHERE name = 'example_ai_research'), 'Real-world case study of AI integration in computer science research. Demonstrates 50% time reduction and improved hypothesis quality.', 'research-team', NOW(), NOW()),
-  ((SELECT id FROM prompts WHERE name = 'example_biomedical_study'), 'Case study of AI-enhanced drug discovery. Shows AI acceleration in protein prediction and drug candidate screening.', 'research-team', NOW(), NOW()),
-  ((SELECT id FROM prompts WHERE name = 'example_social_science'), 'Case study of NLP in social science research. Demonstrates how AI analyzed 50,000 survey responses in 3 weeks.', 'research-team', NOW(), NOW()),
-  ((SELECT id FROM prompts WHERE name = 'foundational_machine_learning'), 'Foundational concepts in supervised machine learning. Covers key principles, algorithms, and research applications.', 'research-team', NOW(), NOW()),
-  ((SELECT id FROM prompts WHERE name = 'foundational_statistics'), 'Foundational statistical hypothesis testing concepts. Covers p-values, significance levels, common tests, and research importance.', 'research-team', NOW(), NOW()),
-  ((SELECT id FROM prompts WHERE name = 'foundational_research_ethics'), 'Research ethics and IRB requirements. Covers core principles, IRB procedures, and special considerations for different research types.', 'research-team', NOW(), NOW()),
-  ((SELECT id FROM prompts WHERE name = 'example_citation_ml'), 'Example citations in machine learning field. Shows proper APA 7th edition formatting with DOI links.', 'research-team', NOW(), NOW()),
-  ((SELECT id FROM prompts WHERE name = 'example_citation_statistics'), 'Example citations in statistics field. Covers foundational statistical texts and guidelines for usage.', 'research-team', NOW(), NOW())
+INSERT INTO pambl_prompt_registry (prompt_id, description, owner, created_at, updated_at) VALUES
+  ((SELECT id FROM pambl_prompts WHERE name = 'research_paper_generator'), 'Main research paper generator that orchestrates all sections through nested pambl_prompts and tag-based injection', 'research-team', NOW(), NOW()),
+  ((SELECT id FROM pambl_prompts WHERE name = 'abstract_template'), 'Reusable abstract template used by research_paper_generator. Contains variable placeholders for subject, focus, and key findings.', 'research-team', NOW(), NOW()),
+  ((SELECT id FROM pambl_prompts WHERE name = 'research_instructions'), 'Guidelines for conducting research in the specified domain. Covers structure, methodology, and quality standards.', 'research-team', NOW(), NOW()),
+  ((SELECT id FROM pambl_prompts WHERE name = 'methodology_template'), 'Detailed methodology section template covering research design, participants, data collection, and analysis methods.', 'research-team', NOW(), NOW()),
+  ((SELECT id FROM pambl_prompts WHERE name = 'validation_checklist'), 'Validation checklist for research methodology. Ensures all quality and validation criteria are met before submission.', 'research-team', NOW(), NOW()),
+  ((SELECT id FROM pambl_prompts WHERE name = 'reference_guidelines'), 'Guidelines for formatting references and citations. Includes citation style requirements and authority level standards.', 'research-team', NOW(), NOW()),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_ai_research'), 'Real-world case study of AI integration in computer science research. Demonstrates 50% time reduction and improved hypothesis quality.', 'research-team', NOW(), NOW()),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_biomedical_study'), 'Case study of AI-enhanced drug discovery. Shows AI acceleration in protein prediction and drug candidate screening.', 'research-team', NOW(), NOW()),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_social_science'), 'Case study of NLP in social science research. Demonstrates how AI analyzed 50,000 survey responses in 3 weeks.', 'research-team', NOW(), NOW()),
+  ((SELECT id FROM pambl_prompts WHERE name = 'foundational_machine_learning'), 'Foundational concepts in supervised machine learning. Covers key principles, algorithms, and research applications.', 'research-team', NOW(), NOW()),
+  ((SELECT id FROM pambl_prompts WHERE name = 'foundational_statistics'), 'Foundational statistical hypothesis testing concepts. Covers p-values, significance levels, common tests, and research importance.', 'research-team', NOW(), NOW()),
+  ((SELECT id FROM pambl_prompts WHERE name = 'foundational_research_ethics'), 'Research ethics and IRB requirements. Covers core principles, IRB procedures, and special considerations for different research types.', 'research-team', NOW(), NOW()),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_citation_ml'), 'Example citations in machine learning field. Shows proper APA 7th edition formatting with DOI links.', 'research-team', NOW(), NOW()),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_citation_statistics'), 'Example citations in statistics field. Covers foundational statistical texts and guidelines for usage.', 'research-team', NOW(), NOW())
 ON CONFLICT (prompt_id) DO UPDATE SET
   description = EXCLUDED.description,
   owner = EXCLUDED.owner,
@@ -415,72 +415,72 @@ ON CONFLICT (prompt_id) DO UPDATE SET
 -- PART 3: INSERT TAGS
 -- ============================================================================
 
-INSERT INTO prompt_tags (prompt_id, tag) VALUES
-  ((SELECT id FROM prompts WHERE name = 'research_paper_generator'), 'template'),
-  ((SELECT id FROM prompts WHERE name = 'research_paper_generator'), 'main'),
-  ((SELECT id FROM prompts WHERE name = 'research_paper_generator'), 'research'),
-  ((SELECT id FROM prompts WHERE name = 'research_paper_generator'), 'academic'),
-  ((SELECT id FROM prompts WHERE name = 'research_paper_generator'), 'paper'),
-  ((SELECT id FROM prompts WHERE name = 'abstract_template'), 'template'),
-  ((SELECT id FROM prompts WHERE name = 'abstract_template'), 'academic'),
-  ((SELECT id FROM prompts WHERE name = 'abstract_template'), 'introduction'),
-  ((SELECT id FROM prompts WHERE name = 'abstract_template'), 'abstract'),
-  ((SELECT id FROM prompts WHERE name = 'research_instructions'), 'template'),
-  ((SELECT id FROM prompts WHERE name = 'research_instructions'), 'academic'),
-  ((SELECT id FROM prompts WHERE name = 'research_instructions'), 'methods'),
-  ((SELECT id FROM prompts WHERE name = 'research_instructions'), 'guidelines'),
-  ((SELECT id FROM prompts WHERE name = 'methodology_template'), 'template'),
-  ((SELECT id FROM prompts WHERE name = 'methodology_template'), 'methods'),
-  ((SELECT id FROM prompts WHERE name = 'methodology_template'), 'academic'),
-  ((SELECT id FROM prompts WHERE name = 'methodology_template'), 'detailed'),
-  ((SELECT id FROM prompts WHERE name = 'validation_checklist'), 'template'),
-  ((SELECT id FROM prompts WHERE name = 'validation_checklist'), 'validation'),
-  ((SELECT id FROM prompts WHERE name = 'validation_checklist'), 'checklist'),
-  ((SELECT id FROM prompts WHERE name = 'validation_checklist'), 'quality'),
-  ((SELECT id FROM prompts WHERE name = 'reference_guidelines'), 'template'),
-  ((SELECT id FROM prompts WHERE name = 'reference_guidelines'), 'academic'),
-  ((SELECT id FROM prompts WHERE name = 'reference_guidelines'), 'references'),
-  ((SELECT id FROM prompts WHERE name = 'reference_guidelines'), 'citations'),
-  ((SELECT id FROM prompts WHERE name = 'example_ai_research'), 'case_study'),
-  ((SELECT id FROM prompts WHERE name = 'example_ai_research'), 'practical_example'),
-  ((SELECT id FROM prompts WHERE name = 'example_ai_research'), 'ai'),
-  ((SELECT id FROM prompts WHERE name = 'example_ai_research'), 'computer_science'),
-  ((SELECT id FROM prompts WHERE name = 'example_ai_research'), 'success_story'),
-  ((SELECT id FROM prompts WHERE name = 'example_biomedical_study'), 'case_study'),
-  ((SELECT id FROM prompts WHERE name = 'example_biomedical_study'), 'practical_example'),
-  ((SELECT id FROM prompts WHERE name = 'example_biomedical_study'), 'biomedical'),
-  ((SELECT id FROM prompts WHERE name = 'example_biomedical_study'), 'health'),
-  ((SELECT id FROM prompts WHERE name = 'example_biomedical_study'), 'drug_discovery'),
-  ((SELECT id FROM prompts WHERE name = 'example_social_science'), 'case_study'),
-  ((SELECT id FROM prompts WHERE name = 'example_social_science'), 'practical_example'),
-  ((SELECT id FROM prompts WHERE name = 'example_social_science'), 'social_science'),
-  ((SELECT id FROM prompts WHERE name = 'example_social_science'), 'psychology'),
-  ((SELECT id FROM prompts WHERE name = 'example_social_science'), 'nlp'),
-  ((SELECT id FROM prompts WHERE name = 'foundational_machine_learning'), 'reference'),
-  ((SELECT id FROM prompts WHERE name = 'foundational_machine_learning'), 'foundational'),
-  ((SELECT id FROM prompts WHERE name = 'foundational_machine_learning'), 'machine_learning'),
-  ((SELECT id FROM prompts WHERE name = 'foundational_machine_learning'), 'ai'),
-  ((SELECT id FROM prompts WHERE name = 'foundational_machine_learning'), 'supervised_learning'),
-  ((SELECT id FROM prompts WHERE name = 'foundational_statistics'), 'reference'),
-  ((SELECT id FROM prompts WHERE name = 'foundational_statistics'), 'foundational'),
-  ((SELECT id FROM prompts WHERE name = 'foundational_statistics'), 'statistics'),
-  ((SELECT id FROM prompts WHERE name = 'foundational_statistics'), 'methodology'),
-  ((SELECT id FROM prompts WHERE name = 'foundational_statistics'), 'hypothesis_testing'),
-  ((SELECT id FROM prompts WHERE name = 'foundational_research_ethics'), 'reference'),
-  ((SELECT id FROM prompts WHERE name = 'foundational_research_ethics'), 'foundational'),
-  ((SELECT id FROM prompts WHERE name = 'foundational_research_ethics'), 'ethics'),
-  ((SELECT id FROM prompts WHERE name = 'foundational_research_ethics'), 'irb'),
-  ((SELECT id FROM prompts WHERE name = 'foundational_research_ethics'), 'research_integrity'),
-  ((SELECT id FROM prompts WHERE name = 'example_citation_ml'), 'reference'),
-  ((SELECT id FROM prompts WHERE name = 'example_citation_ml'), 'example'),
-  ((SELECT id FROM prompts WHERE name = 'example_citation_ml'), 'citations'),
-  ((SELECT id FROM prompts WHERE name = 'example_citation_ml'), 'machine_learning'),
-  ((SELECT id FROM prompts WHERE name = 'example_citation_ml'), 'apa'),
-  ((SELECT id FROM prompts WHERE name = 'example_citation_statistics'), 'reference'),
-  ((SELECT id FROM prompts WHERE name = 'example_citation_statistics'), 'example'),
-  ((SELECT id FROM prompts WHERE name = 'example_citation_statistics'), 'citations'),
-  ((SELECT id FROM prompts WHERE name = 'example_citation_statistics'), 'statistics'),
-  ((SELECT id FROM prompts WHERE name = 'example_citation_statistics'), 'apa')
+INSERT INTO pambl_prompt_tags (prompt_id, tag) VALUES
+  ((SELECT id FROM pambl_prompts WHERE name = 'research_paper_generator'), 'template'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'research_paper_generator'), 'main'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'research_paper_generator'), 'research'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'research_paper_generator'), 'academic'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'research_paper_generator'), 'paper'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'abstract_template'), 'template'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'abstract_template'), 'academic'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'abstract_template'), 'introduction'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'abstract_template'), 'abstract'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'research_instructions'), 'template'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'research_instructions'), 'academic'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'research_instructions'), 'methods'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'research_instructions'), 'guidelines'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'methodology_template'), 'template'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'methodology_template'), 'methods'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'methodology_template'), 'academic'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'methodology_template'), 'detailed'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'validation_checklist'), 'template'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'validation_checklist'), 'validation'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'validation_checklist'), 'checklist'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'validation_checklist'), 'quality'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'reference_guidelines'), 'template'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'reference_guidelines'), 'academic'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'reference_guidelines'), 'references'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'reference_guidelines'), 'citations'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_ai_research'), 'case_study'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_ai_research'), 'practical_example'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_ai_research'), 'ai'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_ai_research'), 'computer_science'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_ai_research'), 'success_story'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_biomedical_study'), 'case_study'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_biomedical_study'), 'practical_example'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_biomedical_study'), 'biomedical'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_biomedical_study'), 'health'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_biomedical_study'), 'drug_discovery'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_social_science'), 'case_study'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_social_science'), 'practical_example'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_social_science'), 'social_science'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_social_science'), 'psychology'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_social_science'), 'nlp'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'foundational_machine_learning'), 'reference'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'foundational_machine_learning'), 'foundational'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'foundational_machine_learning'), 'machine_learning'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'foundational_machine_learning'), 'ai'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'foundational_machine_learning'), 'supervised_learning'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'foundational_statistics'), 'reference'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'foundational_statistics'), 'foundational'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'foundational_statistics'), 'statistics'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'foundational_statistics'), 'methodology'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'foundational_statistics'), 'hypothesis_testing'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'foundational_research_ethics'), 'reference'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'foundational_research_ethics'), 'foundational'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'foundational_research_ethics'), 'ethics'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'foundational_research_ethics'), 'irb'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'foundational_research_ethics'), 'research_integrity'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_citation_ml'), 'reference'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_citation_ml'), 'example'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_citation_ml'), 'citations'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_citation_ml'), 'machine_learning'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_citation_ml'), 'apa'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_citation_statistics'), 'reference'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_citation_statistics'), 'example'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_citation_statistics'), 'citations'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_citation_statistics'), 'statistics'),
+  ((SELECT id FROM pambl_prompts WHERE name = 'example_citation_statistics'), 'apa')
 ON CONFLICT DO NOTHING;
 
 -- ============================================================================
@@ -488,32 +488,32 @@ ON CONFLICT DO NOTHING;
 -- ============================================================================
 
 -- Variable Set 1: General Research Settings
-INSERT INTO variable_sets (id, name, created_at, updated_at) VALUES
+INSERT INTO pambl_variable_sets (id, name, created_at, updated_at) VALUES
   (gen_random_uuid(), 'General Research Settings', NOW(), NOW())
 ON CONFLICT (name) DO NOTHING;
 
 -- Variable Set 2: Academic Style - PhD Level
-INSERT INTO variable_sets (id, name, created_at, updated_at) VALUES
+INSERT INTO pambl_variable_sets (id, name, created_at, updated_at) VALUES
   (gen_random_uuid(), 'Academic Style - PhD Level', NOW(), NOW())
 ON CONFLICT (name) DO NOTHING;
 
 -- Variable Set 3: Validation Framework
-INSERT INTO variable_sets (id, name, created_at, updated_at) VALUES
+INSERT INTO pambl_variable_sets (id, name, created_at, updated_at) VALUES
   (gen_random_uuid(), 'Validation Framework', NOW(), NOW())
 ON CONFLICT (name) DO NOTHING;
 
 -- Variable Set 4: Citation & References
-INSERT INTO variable_sets (id, name, created_at, updated_at) VALUES
+INSERT INTO pambl_variable_sets (id, name, created_at, updated_at) VALUES
   (gen_random_uuid(), 'Citation & References', NOW(), NOW())
 ON CONFLICT (name) DO NOTHING;
 
 -- Variable Set 5: Success Metrics
-INSERT INTO variable_sets (id, name, created_at, updated_at) VALUES
+INSERT INTO pambl_variable_sets (id, name, created_at, updated_at) VALUES
   (gen_random_uuid(), 'Success Metrics', NOW(), NOW())
 ON CONFLICT (name) DO NOTHING;
 
 -- Variable Set 6: Results Presentation
-INSERT INTO variable_sets (id, name, created_at, updated_at) VALUES
+INSERT INTO pambl_variable_sets (id, name, created_at, updated_at) VALUES
   (gen_random_uuid(), 'Results Presentation', NOW(), NOW())
 ON CONFLICT (name) DO NOTHING;
 
@@ -522,67 +522,67 @@ ON CONFLICT (name) DO NOTHING;
 -- ============================================================================
 
 -- Variable Set 1: General Research Settings
-INSERT INTO variable_set_variables (variable_set_id, name, value, created_at, updated_at) VALUES
-  ((SELECT id FROM variable_sets WHERE name = 'General Research Settings'), 'PAPER_TITLE', 'The Impact of AI on Modern Research Methodologies', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'General Research Settings'), 'AUTHOR_NAME', 'Dr. Jane Smith', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'General Research Settings'), 'PUBLICATION_DATE', '2026-02-28', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'General Research Settings'), 'INSTITUTION', 'MIT Media Lab', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'General Research Settings'), 'SUBJECT_AREA', 'Artificial Intelligence and Research Methods', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'General Research Settings'), 'PROBLEM_STATEMENT', 'How can AI improve the speed and accuracy of research workflows?', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'General Research Settings'), 'THESIS_STATEMENT', 'Artificial intelligence provides significant advantages in automating research methodologies while maintaining academic rigor.', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'General Research Settings'), 'CONTEXT_BACKGROUND', 'Recent advances in machine learning have opened new possibilities for automating research tasks.', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'General Research Settings'), 'RESEARCH_DOMAIN', 'Computer Science & Research Methodology', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'General Research Settings'), 'STUDY_LIMITATIONS', 'Limited to academic research domains; may not apply to industry research.', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'General Research Settings'), 'THESIS_RESTATEMENT', 'AI integration in research is transformative and necessary for future academic progress.', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'General Research Settings'), 'FUTURE_RESEARCH_DIRECTIONS', 'Exploring multi-modal AI applications in research and developing AI-human collaborative frameworks.', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'General Research Settings'), 'CLOSING_THOUGHT', 'The future of research lies in synergy between human expertise and artificial intelligence.', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'General Research Settings'), 'LITERATURE_APPROACH', 'systematic review of AI applications across research domains', NOW(), NOW())
+INSERT INTO pambl_variable_set_variables (variable_set_id, name, value, created_at, updated_at) VALUES
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'General Research Settings'), 'PAPER_TITLE', 'The Impact of AI on Modern Research Methodologies', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'General Research Settings'), 'AUTHOR_NAME', 'Dr. Jane Smith', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'General Research Settings'), 'PUBLICATION_DATE', '2026-02-28', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'General Research Settings'), 'INSTITUTION', 'MIT Media Lab', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'General Research Settings'), 'SUBJECT_AREA', 'Artificial Intelligence and Research Methods', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'General Research Settings'), 'PROBLEM_STATEMENT', 'How can AI improve the speed and accuracy of research workflows?', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'General Research Settings'), 'THESIS_STATEMENT', 'Artificial intelligence provides significant advantages in automating research methodologies while maintaining academic rigor.', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'General Research Settings'), 'CONTEXT_BACKGROUND', 'Recent advances in machine learning have opened new possibilities for automating research tasks.', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'General Research Settings'), 'RESEARCH_DOMAIN', 'Computer Science & Research Methodology', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'General Research Settings'), 'STUDY_LIMITATIONS', 'Limited to academic research domains; may not apply to industry research.', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'General Research Settings'), 'THESIS_RESTATEMENT', 'AI integration in research is transformative and necessary for future academic progress.', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'General Research Settings'), 'FUTURE_RESEARCH_DIRECTIONS', 'Exploring multi-modal AI applications in research and developing AI-human collaborative frameworks.', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'General Research Settings'), 'CLOSING_THOUGHT', 'The future of research lies in synergy between human expertise and artificial intelligence.', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'General Research Settings'), 'LITERATURE_APPROACH', 'systematic review of AI applications across research domains', NOW(), NOW())
 ON CONFLICT DO NOTHING;
 
 -- Variable Set 2: Academic Style - PhD Level
-INSERT INTO variable_set_variables (variable_set_id, name, value, created_at, updated_at) VALUES
-  ((SELECT id FROM variable_sets WHERE name = 'Academic Style - PhD Level'), 'FOCUS_AREA', 'computational efficiency and validation frameworks', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Academic Style - PhD Level'), 'METHODOLOGY_BRIEF', 'mixed-methods quantitative and qualitative analysis', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Academic Style - PhD Level'), 'KEY_FINDING', 'AI-assisted research reduces time-to-insight by 40% without sacrificing rigor', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Academic Style - PhD Level'), 'FIELD_IMPLICATIONS', 'accelerating innovation across all research disciplines', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Academic Style - PhD Level'), 'KEYWORDS', 'artificial intelligence, research automation, methodology, academic rigor, machine learning', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Academic Style - PhD Level'), 'AUDIENCE_LEVEL', 'PhD-level researchers and academic professionals', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Academic Style - PhD Level'), 'ACADEMIC_RIGOR', 'Peer-reviewed publication standard with comprehensive statistical validation', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Academic Style - PhD Level'), 'RESEARCH_DESIGN', 'Randomized controlled trial with 500 participants', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Academic Style - PhD Level'), 'PARTICIPANT_DESCRIPTION', 'Academic researchers with 5+ years experience across diverse disciplines', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Academic Style - PhD Level'), 'DATA_COLLECTION_METHOD', 'Automated logging of research workflow metrics combined with semi-structured interviews', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Academic Style - PhD Level'), 'STUDY_DURATION', '18 months', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Academic Style - PhD Level'), 'RESEARCH_TOOLS', 'Python with scikit-learn, custom research tracking dashboard, interview transcription software', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Academic Style - PhD Level'), 'STATISTICAL_METHOD', 'Multi-variate ANOVA with post-hoc Tukey corrections', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Academic Style - PhD Level'), 'CONFIDENCE_LEVEL', '95% (p < 0.05)', NOW(), NOW())
+INSERT INTO pambl_variable_set_variables (variable_set_id, name, value, created_at, updated_at) VALUES
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Academic Style - PhD Level'), 'FOCUS_AREA', 'computational efficiency and validation frameworks', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Academic Style - PhD Level'), 'METHODOLOGY_BRIEF', 'mixed-methods quantitative and qualitative analysis', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Academic Style - PhD Level'), 'KEY_FINDING', 'AI-assisted research reduces time-to-insight by 40% without sacrificing rigor', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Academic Style - PhD Level'), 'FIELD_IMPLICATIONS', 'accelerating innovation across all research disciplines', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Academic Style - PhD Level'), 'KEYWORDS', 'artificial intelligence, research automation, methodology, academic rigor, machine learning', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Academic Style - PhD Level'), 'AUDIENCE_LEVEL', 'PhD-level researchers and academic professionals', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Academic Style - PhD Level'), 'ACADEMIC_RIGOR', 'Peer-reviewed publication standard with comprehensive statistical validation', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Academic Style - PhD Level'), 'RESEARCH_DESIGN', 'Randomized controlled trial with 500 participants', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Academic Style - PhD Level'), 'PARTICIPANT_DESCRIPTION', 'Academic researchers with 5+ years experience across diverse disciplines', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Academic Style - PhD Level'), 'DATA_COLLECTION_METHOD', 'Automated logging of research workflow metrics combined with semi-structured interviews', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Academic Style - PhD Level'), 'STUDY_DURATION', '18 months', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Academic Style - PhD Level'), 'RESEARCH_TOOLS', 'Python with scikit-learn, custom research tracking dashboard, interview transcription software', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Academic Style - PhD Level'), 'STATISTICAL_METHOD', 'Multi-variate ANOVA with post-hoc Tukey corrections', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Academic Style - PhD Level'), 'CONFIDENCE_LEVEL', '95% (p < 0.05)', NOW(), NOW())
 ON CONFLICT DO NOTHING;
 
 -- Variable Set 3: Validation Framework
-INSERT INTO variable_set_variables (variable_set_id, name, value, created_at, updated_at) VALUES
-  ((SELECT id FROM variable_sets WHERE name = 'Validation Framework'), 'VALIDITY_CHECK_1', 'Internal consistency confirmed (Cronbach''s α = 0.87)', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Validation Framework'), 'VALIDITY_CHECK_2', 'External validity verified through replication study', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Validation Framework'), 'VALIDITY_CHECK_3', 'Construct validity established via triangulation with independent measures', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Validation Framework'), 'REVIEW_AUTHORITY', 'Three peer reviewers from top-tier journals', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Validation Framework'), 'VALIDATION_METHOD', 'Independent blind review with consensus scoring', NOW(), NOW())
+INSERT INTO pambl_variable_set_variables (variable_set_id, name, value, created_at, updated_at) VALUES
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Validation Framework'), 'VALIDITY_CHECK_1', 'Internal consistency confirmed (Cronbach''s α = 0.87)', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Validation Framework'), 'VALIDITY_CHECK_2', 'External validity verified through replication study', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Validation Framework'), 'VALIDITY_CHECK_3', 'Construct validity established via triangulation with independent measures', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Validation Framework'), 'REVIEW_AUTHORITY', 'Three peer reviewers from top-tier journals', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Validation Framework'), 'VALIDATION_METHOD', 'Independent blind review with consensus scoring', NOW(), NOW())
 ON CONFLICT DO NOTHING;
 
 -- Variable Set 4: Citation & References
-INSERT INTO variable_set_variables (variable_set_id, name, value, created_at, updated_at) VALUES
-  ((SELECT id FROM variable_sets WHERE name = 'Citation & References'), 'CITATION_STYLE', 'APA 7th Edition', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Citation & References'), 'MIN_REFERENCES', '50', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Citation & References'), 'RECENCY_YEARS', '5', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Citation & References'), 'REFERENCE_BALANCE', '80% peer-reviewed journals, 20% authoritative texts and reports', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Citation & References'), 'AUTHORITY_LEVEL', 'h-index > 5, published in top-tier venues', NOW(), NOW())
+INSERT INTO pambl_variable_set_variables (variable_set_id, name, value, created_at, updated_at) VALUES
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Citation & References'), 'CITATION_STYLE', 'APA 7th Edition', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Citation & References'), 'MIN_REFERENCES', '50', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Citation & References'), 'RECENCY_YEARS', '5', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Citation & References'), 'REFERENCE_BALANCE', '80% peer-reviewed journals, 20% authoritative texts and reports', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Citation & References'), 'AUTHORITY_LEVEL', 'h-index > 5, published in top-tier venues', NOW(), NOW())
 ON CONFLICT DO NOTHING;
 
 -- Variable Set 5: Success Metrics
-INSERT INTO variable_set_variables (variable_set_id, name, value, created_at, updated_at) VALUES
-  ((SELECT id FROM variable_sets WHERE name = 'Success Metrics'), 'SUCCESS_METRICS', 'completion rate > 90%, user satisfaction > 4.5/5, time reduction > 35%, error rate < 2%', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Success Metrics'), 'FINDINGS_SUMMARY', 'Our analysis revealed that AI-assisted research workflows outperformed traditional methods across all measured dimensions', NOW(), NOW()),
-  ((SELECT id FROM variable_sets WHERE name = 'Success Metrics'), 'IMPLICATIONS_FOR_FIELD', 'These findings suggest a paradigm shift toward human-AI collaboration in academic research', NOW(), NOW())
+INSERT INTO pambl_variable_set_variables (variable_set_id, name, value, created_at, updated_at) VALUES
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Success Metrics'), 'SUCCESS_METRICS', 'completion rate > 90%, user satisfaction > 4.5/5, time reduction > 35%, error rate < 2%', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Success Metrics'), 'FINDINGS_SUMMARY', 'Our analysis revealed that AI-assisted research workflows outperformed traditional methods across all measured dimensions', NOW(), NOW()),
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Success Metrics'), 'IMPLICATIONS_FOR_FIELD', 'These findings suggest a paradigm shift toward human-AI collaboration in academic research', NOW(), NOW())
 ON CONFLICT DO NOTHING;
 
 -- Variable Set 6: Results Presentation
-INSERT INTO variable_set_variables (variable_set_id, name, value, created_at, updated_at) VALUES
-  ((SELECT id FROM variable_sets WHERE name = 'Results Presentation'), 'RESULTS_PRESENTATION_STYLE', 'quantitative metrics with supporting qualitative narratives', NOW(), NOW())
+INSERT INTO pambl_variable_set_variables (variable_set_id, name, value, created_at, updated_at) VALUES
+  ((SELECT id FROM pambl_variable_sets WHERE name = 'Results Presentation'), 'RESULTS_PRESENTATION_STYLE', 'quantitative metrics with supporting qualitative narratives', NOW(), NOW())
 ON CONFLICT DO NOTHING;
