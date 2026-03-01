@@ -7,15 +7,9 @@
 -- Or with environment variables:
 --   psql -h $DB_HOSTNAME -U $DB_USERNAME -d $DB_DATABASE -f load_to_postgres.sql
 
-\echo '=== Research Paper System Loader ==='
-\echo 'Loading 14 prompts with tags, metadata, and 6 variable sets...'
-
 -- ============================================================================
 -- PART 1: INSERT PROMPTS
 -- ============================================================================
-
-\echo ''
-\echo 'Step 1: Inserting 14 prompts...'
 
 INSERT INTO prompts (name, content, created_at, updated_at) VALUES
   ('research_paper_generator', '#! Research Paper Generator - Complete System
@@ -393,13 +387,9 @@ ON CONFLICT (name) DO UPDATE SET
   content = EXCLUDED.content,
   updated_at = NOW();
 
-\echo '✓ Inserted 14 prompts'
-
 -- ============================================================================
 -- PART 2: INSERT PROMPT REGISTRY ENTRIES (descriptions)
 -- ============================================================================
-
-\echo 'Step 2: Adding prompt metadata (descriptions, owners)...'
 
 INSERT INTO prompt_registry (prompt_id, description, owner, created_at, updated_at) VALUES
   ((SELECT id FROM prompts WHERE name = 'research_paper_generator'), 'Main research paper generator that orchestrates all sections through nested prompts and tag-based injection', 'research-team', NOW(), NOW()),
@@ -421,13 +411,9 @@ ON CONFLICT (prompt_id) DO UPDATE SET
   owner = EXCLUDED.owner,
   updated_at = NOW();
 
-\echo '✓ Added prompt metadata'
-
 -- ============================================================================
 -- PART 3: INSERT TAGS
 -- ============================================================================
-
-\echo 'Step 3: Adding prompt tags...'
 
 INSERT INTO prompt_tags (prompt_id, tag) VALUES
   ((SELECT id FROM prompts WHERE name = 'research_paper_generator'), 'template'),
@@ -497,13 +483,9 @@ INSERT INTO prompt_tags (prompt_id, tag) VALUES
   ((SELECT id FROM prompts WHERE name = 'example_citation_statistics'), 'apa')
 ON CONFLICT DO NOTHING;
 
-\echo '✓ Added 63 tags across prompts'
-
 -- ============================================================================
 -- PART 4: CREATE VARIABLE SETS
 -- ============================================================================
-
-\echo 'Step 4: Creating 6 variable sets...'
 
 -- Variable Set 1: General Research Settings
 INSERT INTO variable_sets (id, name, created_at, updated_at) VALUES
@@ -535,14 +517,11 @@ INSERT INTO variable_sets (id, name, created_at, updated_at) VALUES
   (gen_random_uuid(), 'Results Presentation', NOW(), NOW())
 ON CONFLICT (name) DO NOTHING;
 
-\echo '✓ Created 6 variable sets'
-
 -- ============================================================================
--- PART 5: INSERT VARIABLES FOR SET 1: General Research Settings
+-- PART 5: INSERT VARIABLES
 -- ============================================================================
 
-\echo 'Step 5: Populating variable sets...'
-
+-- Variable Set 1: General Research Settings
 INSERT INTO variable_set_variables (variable_set_id, name, value, created_at, updated_at) VALUES
   ((SELECT id FROM variable_sets WHERE name = 'General Research Settings'), 'PAPER_TITLE', 'The Impact of AI on Modern Research Methodologies', NOW(), NOW()),
   ((SELECT id FROM variable_sets WHERE name = 'General Research Settings'), 'AUTHOR_NAME', 'Dr. Jane Smith', NOW(), NOW()),
@@ -607,29 +586,3 @@ ON CONFLICT DO NOTHING;
 INSERT INTO variable_set_variables (variable_set_id, name, value, created_at, updated_at) VALUES
   ((SELECT id FROM variable_sets WHERE name = 'Results Presentation'), 'RESULTS_PRESENTATION_STYLE', 'quantitative metrics with supporting qualitative narratives', NOW(), NOW())
 ON CONFLICT DO NOTHING;
-
-\echo '✓ Populated variable sets with 47 total variables'
-
--- ============================================================================
--- SUMMARY
--- ============================================================================
-
-\echo ''
-\echo '=== LOAD COMPLETE ==='
-\echo '✓ Loaded 14 prompts'
-\echo '✓ Added 14 descriptions'
-\echo '✓ Applied 63 tags'
-\echo '✓ Created 6 variable sets'
-\echo '✓ Populated 47 variables'
-\echo ''
-\echo 'Summary of loaded prompts:'
-SELECT COUNT(*) as total_prompts FROM prompts;
-\echo ''
-\echo 'Summary of variable sets:'
-SELECT name, COUNT(*) as variable_count FROM variable_set_variables GROUP BY variable_set_id, name ORDER BY name;
-\echo ''
-\echo 'To use these prompts:'
-\echo '1. In Python: source = DatabaseSource(conn); provider = PromptProvider(source)'
-\echo '2. In Web UI: Set PROMPT_ASSEMBLE_SOURCE=database and database env vars'
-\echo '3. Find by tags: provider.find_by_tag("case_study", "practical_example")'
-\echo ''
