@@ -1,0 +1,27 @@
+#! Case Study: AI in Biomedical Research
+#! Tagged as case_study and practical_example for tag-based injection
+
+<case_study>
+  <title>AI-Enhanced Drug Discovery and Protein Analysis</title>
+
+  <context>
+  A biomedical research institute used AI to accelerate protein structure prediction and drug candidate screening. Instead of traditional manual analysis, they employed neural networks trained on known protein structures.
+  </context>
+
+  <results>
+  - Protein structure predictions: accuracy improved from 75% to 92%
+  - Drug candidate screening: processed 10,000+ compounds in 2 weeks (vs 6 months traditionally)
+  - False positives: reduced by 40% through ensemble methods
+  - Cost per successful candidate: reduced by 65%
+  </results>
+
+  <challenges_addressed>
+  1. Limited training data in some disease areas - solved with transfer learning
+  2. Regulatory compliance requirements - implemented explainability layers
+  3. Validation against wet-lab results - created hybrid validation pipeline
+  </challenges_addressed>
+
+  <impact>
+  AI acceleration reduced time-to-clinic by an estimated 2-3 years for new drug candidates, with significant cost savings and improved success rates in early-stage trials.
+  </impact>
+</case_study>

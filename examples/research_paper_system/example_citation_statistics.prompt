@@ -1,0 +1,29 @@
+#! Example Citation: Statistics
+#! Tagged as reference and example for tag-based injection
+
+<citation>
+  <format>APA 7th Edition</format>
+
+  <example_citations>
+  1. Cohen, J. (1988). Statistical power analysis for the behavioral sciences (2nd ed.). Lawrence Erlbaum Associates.
+
+  2. Kline, R. B. (2015). Principles and practice of structural equation modeling (4th ed.). Guilford Press.
+
+  3. Tukey, J. W. (1977). Exploratory data analysis. Addison-Wesley.
+
+  4. Efron, B., & Tibshirani, R. J. (1993). An introduction to the bootstrap. Chapman and Hall.
+
+  5. Wilkinson, L., & The Task Force on Statistical Inference. (1999). Statistical methods in psychology journals: Guidelines and explanations. American Psychologist, 54(8), 594-604.
+  </example_citations>
+
+  <citation_context>
+  These foundational statistical references are frequently cited in methodology sections. They provide established protocols for statistical analysis and are highly credible sources for statistical methods.
+  </citation_context>
+
+  <usage_guidelines>
+  - Use Cohen (1988) for power analysis and effect size discussions
+  - Reference Kline (2015) for structural equation modeling details
+  - Cite Tukey (1977) for exploratory data analysis approaches
+  - Bootstrap methods: cite Efron & Tibshirani (1993)
+  </usage_guidelines>
+</citation>

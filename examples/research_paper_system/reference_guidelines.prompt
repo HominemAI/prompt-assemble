@@ -1,0 +1,16 @@
+#! Reference Guidelines - Used by research_paper_generator
+
+Reference Guidelines for [[SUBJECT_AREA]]
+
+All references must follow [[CITATION_STYLE]] format.
+
+Citation Standards:
+- Minimum [[MIN_REFERENCES]] references required for [[SUBJECT_AREA]]
+- Preference for sources from last [[RECENCY_YEARS]] years
+- Balance of [[REFERENCE_BALANCE]] sources
+- Authority Level Required: [[AUTHORITY_LEVEL]]
+
+Example citations in [[SUBJECT_AREA]]:
+[[PROMPT_TAG: reference, example]]
+
+Ensure all citations are complete with authors, dates, and URLs where applicable.

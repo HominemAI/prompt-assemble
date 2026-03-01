@@ -1,0 +1,29 @@
+#! Foundational Concepts: Machine Learning
+#! Tagged as reference and foundational for tag-based injection
+
+<foundational_concept>
+  <topic>Supervised Learning Fundamentals</topic>
+
+  <definition>
+  Supervised learning is a machine learning paradigm where models learn from labeled training data to predict outputs for new inputs. Each training example includes both features (inputs) and the correct answer (label/output).
+  </definition>
+
+  <key_principles>
+  1. Training Data: Must contain sufficient labeled examples representing the problem space
+  2. Generalization: Model should work well on unseen data, not just memorize training data
+  3. Overfitting: Risk of learning training noise instead of underlying patterns
+  4. Cross-Validation: Essential technique for assessing true performance
+  </key_principles>
+
+  <common_algorithms>
+  - Linear Regression: for continuous predictions
+  - Logistic Regression: for binary classification
+  - Decision Trees: for interpretable non-linear classification
+  - Support Vector Machines: for high-dimensional classification
+  - Neural Networks: for complex pattern recognition
+  </common_algorithms>
+
+  <application_in_research>
+  Supervised learning is ideal for research applications where labeled training data is available, such as image classification, text categorization, or scientific measurement prediction.
+  </application_in_research>
+</foundational_concept>

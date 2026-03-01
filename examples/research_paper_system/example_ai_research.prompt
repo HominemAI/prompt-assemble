@@ -1,0 +1,28 @@
+#! Case Study: AI in Modern Research
+#! This is tagged as case_study and practical_example for tag-based injection
+
+<case_study>
+  <title>AI-Assisted Research Acceleration in Computer Science</title>
+
+  <context>
+  A major research university integrated AI tools into their computer science department's workflow. Researchers used machine learning models to help analyze large datasets and generate preliminary hypotheses.
+  </context>
+
+  <results>
+  - Time to initial analysis: reduced from 4 weeks to 2 weeks (50% reduction)
+  - Hypothesis quality: improved by 35% (validated against expert judgment)
+  - Number of variables examined: increased from 50 to 300+ (maintaining accuracy)
+  - Publication timeline: accelerated by 6 months on average
+  </results>
+
+  <lessons_learned>
+  1. AI tools are most effective when combined with human expert review
+  2. Data quality is critical - garbage in, garbage out still applies
+  3. Researchers need training to effectively utilize AI capabilities
+  4. Integration takes 2-3 months for full adoption in established labs
+  </lessons_learned>
+
+  <key_insight>
+  AI should augment, not replace, human research judgment. The most successful implementations paired AI efficiency with human oversight.
+  </key_insight>
+</case_study>
