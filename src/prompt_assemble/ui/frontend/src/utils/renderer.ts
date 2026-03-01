@@ -18,10 +18,15 @@ export interface RendererOptions {
  * - [[PROMPT_TAG: t1, t2]]: Inject all prompts matching tags (AND)
  * - [[PROMPT_TAG:N: t1, t2]]: Inject N most recent prompts matching tags
  *
+ * Variable hierarchy: When including a prompt via [[PROMPT: name]], variables accumulate.
+ * The included prompt is rendered with both parent variables and its own variables
+ * (prompt's variables override parent's if there's a conflict).
+ *
  * @param content The template text containing sigils
  * @param variables Variables to substitute (all converted to strings)
  * @param fetchPrompt Async function to fetch prompt content by name
  * @param findByTags Sync function to find prompt names matching tags (AND intersection, desc order)
+ * @param getPromptVariables Optional async function to get variables for a prompt by name
  * @param options Rendering options (maxDepth, recursive)
  * @returns Promise<string> with all sigils replaced
  */
@@ -30,6 +35,7 @@ export async function renderPrompt(
   variables: Record<string, string>,
   fetchPrompt: (name: string) => Promise<string>,
   findByTags: (tags: string[]) => string[],
+  getPromptVariables?: (name: string) => Promise<Record<string, string>>,
   options: RendererOptions = {},
 ): Promise<string> {
   const maxDepth = options.maxDepth ?? 10;
@@ -40,7 +46,15 @@ export async function renderPrompt(
 
   let currentText = text;
   for (let depth = 0; depth < maxDepth; depth++) {
-    const newText = await replaceSigils(currentText, variables, fetchPrompt, findByTags);
+    const newText = await replaceSigils(
+      currentText,
+      variables,
+      fetchPrompt,
+      findByTags,
+      getPromptVariables,
+      maxDepth,
+      depth,
+    );
 
     // If no changes, we're done
     if (newText === currentText) {
@@ -109,12 +123,16 @@ function parsePromptTagSigil(content: string): [number | null, string[]] {
 /**
  * Replace all sigils in text (one pass).
  * Uses silent failure: undefined vars/prompts return "".
+ * Passes depth information to prevent infinite recursion.
  */
 async function replaceSigils(
   text: string,
   variables: Record<string, string>,
   fetchPrompt: (name: string) => Promise<string>,
   findByTags: (tags: string[]) => string[],
+  getPromptVariables?: (name: string) => Promise<Record<string, string>>,
+  maxDepth: number = 10,
+  currentDepth: number = 0,
 ): Promise<string> {
   // Find all sigils
   const sigilRegex = /\[\[([^\[\]]+)\]\]/g;
@@ -142,6 +160,9 @@ async function replaceSigils(
       variables,
       fetchPrompt,
       findByTags,
+      getPromptVariables,
+      maxDepth,
+      currentDepth,
     );
     replacements[sigil.match] = replacement;
   }
@@ -159,12 +180,20 @@ async function replaceSigils(
 /**
  * Resolve a single sigil to its replacement value.
  * Silent failure: returns "" if variable/prompt not found.
+ *
+ * Implements variable hierarchy:
+ * - When including a prompt, merge parent variables with prompt's variables
+ * - Prompt variables override parent variables on conflict
+ * - Recursively render included prompts with merged variables
  */
 async function resolveSigil(
   content: string,
   variables: Record<string, string>,
   fetchPrompt: (name: string) => Promise<string>,
   findByTags: (tags: string[]) => string[],
+  getPromptVariables?: (name: string) => Promise<Record<string, string>>,
+  maxDepth: number = 10,
+  currentDepth: number = 0,
 ): Promise<string> {
   // PROMPT_TAG: sigil
   if (content.startsWith('PROMPT_TAG:')) {
@@ -186,12 +215,36 @@ async function resolveSigil(
         return '';
       }
 
-      // Fetch content for each matching prompt
+      // Fetch content for each matching prompt and render with variable hierarchy
       const results: string[] = [];
       for (const name of matchingNames) {
         try {
           const promptContent = await fetchPrompt(name);
-          results.push(promptContent);
+
+          // Get variables for this prompt (if it's a document) and merge with parent
+          let mergedVariables = variables;
+          if (getPromptVariables) {
+            try {
+              const promptVars = await getPromptVariables(name);
+              // Merge: parent variables + prompt variables (prompt overrides parent)
+              mergedVariables = { ...variables, ...promptVars };
+            } catch (error) {
+              // Silently continue if getPromptVariables fails
+              console.debug(`Could not get variables for prompt: ${name}`, error);
+            }
+          }
+
+          // Recursively render the prompt with merged variables
+          const renderedContent = await renderPrompt(
+            promptContent,
+            mergedVariables,
+            fetchPrompt,
+            findByTags,
+            getPromptVariables,
+            { maxDepth, recursive: true },
+          );
+
+          results.push(renderedContent);
         } catch (error) {
           // Silent failure: skip this prompt
           console.warn(`Failed to fetch prompt: ${name}`, error);
@@ -211,7 +264,32 @@ async function resolveSigil(
     const promptName = content.slice(7).trim();
 
     try {
-      return await fetchPrompt(promptName);
+      const promptContent = await fetchPrompt(promptName);
+
+      // Get variables for this prompt (if it's a document) and merge with parent
+      let mergedVariables = variables;
+      if (getPromptVariables) {
+        try {
+          const promptVars = await getPromptVariables(promptName);
+          // Merge: parent variables + prompt variables (prompt overrides parent)
+          mergedVariables = { ...variables, ...promptVars };
+        } catch (error) {
+          // Silently continue if getPromptVariables fails
+          console.debug(`Could not get variables for prompt: ${promptName}`, error);
+        }
+      }
+
+      // Recursively render the prompt with merged variables
+      const renderedContent = await renderPrompt(
+        promptContent,
+        mergedVariables,
+        fetchPrompt,
+        findByTags,
+        getPromptVariables,
+        { maxDepth, recursive: true },
+      );
+
+      return renderedContent;
     } catch (error) {
       // Silent failure
       console.warn(`Failed to fetch prompt: ${promptName}`, error);

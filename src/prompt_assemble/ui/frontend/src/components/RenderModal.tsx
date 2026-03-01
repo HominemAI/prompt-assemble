@@ -4,11 +4,37 @@ import { renderPrompt } from '../utils/renderer';
 import { xmlToJson } from '../utils/xmlToJson';
 import '../styles/RenderModal.css';
 
+interface VariableSet {
+  id: string;
+  name: string;
+  variables: Record<string, string>;
+}
+
+interface Document {
+  id: string;
+  name: string;
+  content: string;
+  metadata: {
+    description: string;
+    tags: string[];
+    owner?: string;
+    revisionComments?: string;
+  };
+  isDirty: boolean;
+  isLocked: boolean;
+  savedAt?: string;
+  previousVersionId?: string;
+  variableSetIds?: string[];
+  variableOverrides?: Record<string, Record<string, string>>;
+}
+
 interface RenderModalProps {
   isOpen: boolean;
   content: string;
   variables: Record<string, string>;
   allPrompts: Array<{ name: string; content: string; tags?: string[] }>;
+  documents?: Document[];
+  variableSets?: VariableSet[];
   onClose: () => void;
 }
 
@@ -20,6 +46,8 @@ const RenderModal: React.FC<RenderModalProps> = ({
   content,
   variables,
   allPrompts,
+  documents = [],
+  variableSets = [],
   onClose,
 }) => {
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('xml');
@@ -30,6 +58,33 @@ const RenderModal: React.FC<RenderModalProps> = ({
   const preRef = useRef<HTMLPreElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const isMouseDownOnOverlay = useRef(false);
+
+  // Get merged variables for a prompt (if it's a document)
+  const getPromptVariables = async (promptName: string): Promise<Record<string, string>> => {
+    // Check if this prompt is a document in our documents list
+    const doc = documents.find((d) => d.name.toLowerCase() === promptName.toLowerCase());
+    if (!doc) {
+      return {};
+    }
+
+    // Merge variables for this document
+    const setIds = doc.variableSetIds || [];
+    const overrides = doc.variableOverrides || {};
+    let merged: Record<string, string> = {};
+
+    for (const setId of setIds) {
+      const varSet = variableSets.find((vs) => vs.id === setId);
+      if (varSet) {
+        merged = { ...merged, ...varSet.variables };
+      }
+
+      // Apply overrides for this set (overrides win)
+      const setOverrides = overrides[setId] || {};
+      merged = { ...merged, ...setOverrides };
+    }
+
+    return merged;
+  };
 
   // Perform rendering when modal opens
   React.useEffect(() => {
@@ -44,6 +99,7 @@ const RenderModal: React.FC<RenderModalProps> = ({
           contentLength: content.length,
           variablesCount: Object.keys(variables).length,
           availablePromptsCount: allPrompts.length,
+          documentsCount: documents.length,
         });
 
         // Build fetcher for prompts
@@ -92,12 +148,13 @@ const RenderModal: React.FC<RenderModalProps> = ({
           return matching.reverse().map((p) => p.name);
         };
 
-        // Render the prompt
+        // Render the prompt with variable hierarchy support
         const rendered = await renderPrompt(
           content,
           variables,
           fetchPrompt,
-          findByTags
+          findByTags,
+          getPromptVariables
         );
 
         setOutput(rendered);
@@ -110,7 +167,7 @@ const RenderModal: React.FC<RenderModalProps> = ({
     };
 
     performRender();
-  }, [isOpen, content, variables, allPrompts]);
+  }, [isOpen, content, variables, allPrompts, documents, variableSets]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     isMouseDownOnOverlay.current = e.target === overlayRef.current;

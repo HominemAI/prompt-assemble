@@ -996,6 +996,8 @@ You are a helpful assistant specializing in [[DOMAIN]].
           content={activeDoc.content}
           variables={getMergedVariables()}
           allPrompts={prompts}
+          documents={documents}
+          variableSets={variableSets}
           onClose={() => setShowRenderModal(false)}
         />
       )}
