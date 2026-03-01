@@ -83,6 +83,7 @@ const RenderModal: React.FC<RenderModalProps> = ({
       merged = { ...merged, ...setOverrides };
     }
 
+    console.log(`getPromptVariables: Found document "${promptName}" with variables:`, merged);
     return merged;
   };
 

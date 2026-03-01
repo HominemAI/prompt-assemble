@@ -228,6 +228,11 @@ async function resolveSigil(
               const promptVars = await getPromptVariables(name);
               // Merge: parent variables + prompt variables (prompt overrides parent)
               mergedVariables = { ...variables, ...promptVars };
+              console.debug(`Merged variables for prompt "${name}":`, {
+                parentVars: Object.keys(variables),
+                promptVars: Object.keys(promptVars),
+                merged: Object.keys(mergedVariables),
+              });
             } catch (error) {
               // Silently continue if getPromptVariables fails
               console.debug(`Could not get variables for prompt: ${name}`, error);
@@ -273,6 +278,11 @@ async function resolveSigil(
           const promptVars = await getPromptVariables(promptName);
           // Merge: parent variables + prompt variables (prompt overrides parent)
           mergedVariables = { ...variables, ...promptVars };
+          console.debug(`Merged variables for prompt "${promptName}":`, {
+            parentVars: Object.keys(variables),
+            promptVars: Object.keys(promptVars),
+            merged: Object.keys(mergedVariables),
+          });
         } catch (error) {
           // Silently continue if getPromptVariables fails
           console.debug(`Could not get variables for prompt: ${promptName}`, error);
