@@ -76,6 +76,11 @@ def create_app(source=None, config=None):
             logger.warning("Static files not built. Run: npm run build in the frontend directory")
             return _get_index_html()
 
+    @app.route("/assets/<path:filename>")
+    def serve_assets(filename):
+        """Serve static assets (JS, CSS, etc.)"""
+        return app.send_static_file(f"assets/{filename}")
+
     # ====== API Routes ======
 
     @app.route("/api/prompts", methods=["GET"])
