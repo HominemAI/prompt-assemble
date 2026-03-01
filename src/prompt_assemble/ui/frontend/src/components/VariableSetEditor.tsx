@@ -17,6 +17,7 @@ interface VariableItem {
 interface VariableSetEditorProps {
   variableSet: VariableSet;
   onBack: () => void;
+  onClose: () => void;
   onSave: (updatedSet: VariableSet) => void;
   onDelete: (id: string) => void;
 }
@@ -29,6 +30,7 @@ interface UnsavedModal {
 const VariableSetEditor: React.FC<VariableSetEditorProps> = ({
   variableSet,
   onBack,
+  onClose,
   onSave,
   onDelete,
 }) => {
@@ -75,7 +77,7 @@ const VariableSetEditor: React.FC<VariableSetEditorProps> = ({
       if (action === 'back') {
         onBack();
       } else {
-        // Close - handled by parent
+        onClose();
       }
     }
   };
@@ -137,10 +139,14 @@ const VariableSetEditor: React.FC<VariableSetEditorProps> = ({
       handleSave();
       if (unsavedModal.action === 'back') {
         onBack();
+      } else if (unsavedModal.action === 'close') {
+        onClose();
       }
     } else if (action === 'discard') {
       if (unsavedModal.action === 'back') {
         onBack();
+      } else if (unsavedModal.action === 'close') {
+        onClose();
       }
     }
     setUnsavedModal({ isOpen: false, action: null });
@@ -157,7 +163,7 @@ const VariableSetEditor: React.FC<VariableSetEditorProps> = ({
             type="text"
             value={setName}
             onChange={(e) => setSetName(e.target.value)}
-            className="set-name-input"
+            className="form-input"
             placeholder="Variable Set Name"
           />
           <button className="modal-close-btn" onClick={() => attemptToLeave('close')}>
@@ -173,13 +179,13 @@ const VariableSetEditor: React.FC<VariableSetEditorProps> = ({
                 value={variable.key}
                 onChange={(e) => handleUpdateVariable(index, 'key', e.target.value)}
                 placeholder="Key"
-                className="variable-key"
+                className="form-input"
               />
               <textarea
                 value={variable.value}
                 onChange={(e) => handleUpdateVariable(index, 'value', e.target.value)}
                 placeholder="Value"
-                className="variable-value"
+                className="form-input"
               />
               <button
                 className={`delete-var-btn ${deleteLineId === index.toString() ? 'confirm' : ''}`}
@@ -223,8 +229,6 @@ const VariableSetEditor: React.FC<VariableSetEditorProps> = ({
           isDangerous={false}
           onConfirm={() => handleUnsavedAction('save')}
           onCancel={() => handleUnsavedAction('discard')}
-          onClose={() => handleUnsavedAction('cancel')}
-          showClose={true}
         />
       )}
 

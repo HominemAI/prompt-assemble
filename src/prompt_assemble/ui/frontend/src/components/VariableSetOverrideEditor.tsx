@@ -67,7 +67,7 @@ const VariableSetOverrideEditor: React.FC<VariableSetOverrideEditorProps> = ({
                   value={currentOverrides[key] ?? ''}
                   onChange={(e) => handleUpdateOverride(key, e.target.value)}
                   placeholder="Leave empty to use default"
-                  className="override-input"
+                  className="form-input"
                 />
               </div>
             ))

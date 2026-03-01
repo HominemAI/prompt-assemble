@@ -11,6 +11,7 @@ import {
   FiUnlock,
   FiSun,
   FiMoon,
+  FiCode,
   FiClock,
 } from 'react-icons/fi';
 import { useTheme } from './hooks/useTheme';
@@ -22,7 +23,15 @@ import RevisionCommentModal from './components/RevisionCommentModal';
 import VersionHistoryModal from './components/VersionHistoryModal';
 import AlertModal from './components/AlertModal';
 import ConfirmModal from './components/ConfirmModal';
+import VariableSetsModal from './components/VariableSetsModal';
+import VariableSetsSelector from './components/VariableSetsSelector';
 import './App.css';
+
+interface VariableSet {
+  id: string;
+  name: string;
+  variables: Record<string, string>;
+}
 
 interface Document {
   id: string;
@@ -38,6 +47,8 @@ interface Document {
   isLocked: boolean;
   savedAt?: string;
   previousVersionId?: string;
+  variableSetIds?: string[];
+  variableOverrides?: Record<string, Record<string, string>>;
 }
 
 interface Prompt {
@@ -89,6 +100,11 @@ const App: React.FC = () => {
   const [allTags, setAllTags] = useState<string[]>([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
+  // Variable Sets
+  const [variableSets, setVariableSets] = useState<VariableSet[]>([]);
+  const [showVariableSetsModal, setShowVariableSetsModal] = useState(false);
+  const [showVariableSetSelector, setShowVariableSetSelector] = useState(false);
+
   // Modal state
   const [alertModal, setAlertModal] = useState<{ isOpen: boolean; title: string; message: string }>({
     isOpen: false,
@@ -139,6 +155,7 @@ const App: React.FC = () => {
   useEffect(() => {
     loadPrompts(true); // Show loading state on initial load only
     loadTags();
+    loadVariableSets();
 
     // Setup offline/online listeners
     const handleOnline = () => {
@@ -188,6 +205,16 @@ const App: React.FC = () => {
       setAllTags(data.tags || []);
     } catch (error) {
       console.error('Error loading tags:', error);
+    }
+  };
+
+  const loadVariableSets = async () => {
+    try {
+      const response = await fetch('/api/variable-sets');
+      const data = await response.json();
+      setVariableSets(data.variable_sets || []);
+    } catch (error) {
+      console.error('Error loading variable sets:', error);
     }
   };
 
@@ -680,6 +707,14 @@ You are a helpful assistant specializing in [[DOMAIN]].
           </div>
         )}
         <button
+          className="btn-icon"
+          onClick={() => setShowVariableSetsModal(true)}
+          title="Manage Variable Sets"
+        >
+          <FiCode size={20} />
+          Variables
+        </button>
+        <button
           className="btn-theme-toggle"
           onClick={toggleTheme}
           title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
@@ -775,6 +810,14 @@ You are a helpful assistant specializing in [[DOMAIN]].
                 >
                   <FiDownload size={18} />
                   Export
+                </button>
+                <button
+                  className="btn btn-default"
+                  onClick={() => setShowVariableSetSelector(true)}
+                  title="Select and override variable sets"
+                >
+                  <FiCode size={18} />
+                  Variables
                 </button>
                 <div style={{ marginLeft: 'auto' }} />
                 <button
@@ -887,6 +930,21 @@ You are a helpful assistant specializing in [[DOMAIN]].
             });
           }}
           onClose={() => setShowVersionHistory(false)}
+        />
+      )}
+
+      {/* Variable Sets Modal */}
+      <VariableSetsModal
+        isOpen={showVariableSetsModal}
+        onClose={() => setShowVariableSetsModal(false)}
+      />
+
+      {/* Variable Sets Selector (per-document) */}
+      {activeDoc && (
+        <VariableSetsSelector
+          isOpen={showVariableSetSelector}
+          onClose={() => setShowVariableSetSelector(false)}
+          allVariableSets={variableSets}
         />
       )}
 

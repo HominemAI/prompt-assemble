@@ -131,6 +131,66 @@ class DatabaseSource(PromptSource):
                 """
             )
 
+            # Variable Sets tables
+            cursor.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {self._table('variable_sets')} (
+                    id TEXT PRIMARY KEY,
+                    name TEXT UNIQUE NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+
+            cursor.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {self._table('variable_set_variables')} (
+                    id TEXT PRIMARY KEY,
+                    variable_set_id TEXT NOT NULL,
+                    key TEXT NOT NULL,
+                    value TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(variable_set_id, key),
+                    FOREIGN KEY (variable_set_id) REFERENCES {self._table('variable_sets')}(id)
+                )
+                """
+            )
+
+            cursor.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {self._table('variable_set_selections')} (
+                    id TEXT PRIMARY KEY,
+                    prompt_id TEXT NOT NULL,
+                    variable_set_id TEXT NOT NULL,
+                    list_order INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(prompt_id, variable_set_id),
+                    FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id),
+                    FOREIGN KEY (variable_set_id) REFERENCES {self._table('variable_sets')}(id)
+                )
+                """
+            )
+
+            cursor.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {self._table('variable_set_overrides')} (
+                    id TEXT PRIMARY KEY,
+                    prompt_id TEXT NOT NULL,
+                    variable_set_id TEXT NOT NULL,
+                    key TEXT NOT NULL,
+                    override_value TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(prompt_id, variable_set_id, key),
+                    FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id),
+                    FOREIGN KEY (variable_set_id) REFERENCES {self._table('variable_sets')}(id)
+                )
+                """
+            )
+
             self.connection.commit()
 
         cursor.close()
@@ -398,5 +458,210 @@ class DatabaseSource(PromptSource):
             self._emit("prompt_saved")
             return prompt_id
 
+        finally:
+            cursor.close()
+
+    # Variable Sets Management Methods
+
+    def create_variable_set(self, name: str, variables: Optional[Dict[str, str]] = None) -> str:
+        """
+        Create a new variable set.
+
+        Args:
+            name: Variable set name
+            variables: Dict of key-value pairs
+
+        Returns:
+            Variable set ID
+        """
+        import uuid
+
+        if variables is None:
+            variables = {}
+
+        cursor = self.connection.cursor()
+        try:
+            set_id = str(uuid.uuid4())
+            cursor.execute(
+                f"INSERT INTO {self._table('variable_sets')} (id, name) VALUES (%s, %s)",
+                (set_id, name),
+            )
+
+            # Add variables
+            for key, value in variables.items():
+                cursor.execute(
+                    f"INSERT INTO {self._table('variable_set_variables')} (id, variable_set_id, key, value) VALUES (%s, %s, %s, %s)",
+                    (str(uuid.uuid4()), set_id, key, value),
+                )
+
+            self.connection.commit()
+            return set_id
+        finally:
+            cursor.close()
+
+    def get_variable_set(self, set_id: str) -> Optional[Dict[str, Any]]:
+        """Get a variable set by ID."""
+        cursor = self.connection.cursor()
+        try:
+            cursor.execute(f"SELECT id, name FROM {self._table('variable_sets')} WHERE id = %s", (set_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+
+            set_id, name = row
+            cursor.execute(
+                f"SELECT key, value FROM {self._table('variable_set_variables')} WHERE variable_set_id = %s",
+                (set_id,),
+            )
+
+            variables = {row[0]: row[1] for row in cursor.fetchall()}
+            return {"id": set_id, "name": name, "variables": variables}
+        finally:
+            cursor.close()
+
+    def list_variable_sets(self) -> List[Dict[str, Any]]:
+        """List all variable sets."""
+        cursor = self.connection.cursor()
+        try:
+            cursor.execute(f"SELECT id, name FROM {self._table('variable_sets')} ORDER BY name")
+            sets = []
+            for row in cursor.fetchall():
+                set_id, name = row
+                cursor.execute(
+                    f"SELECT key, value FROM {self._table('variable_set_variables')} WHERE variable_set_id = %s",
+                    (set_id,),
+                )
+                variables = {r[0]: r[1] for r in cursor.fetchall()}
+                sets.append({"id": set_id, "name": name, "variables": variables})
+            return sets
+        finally:
+            cursor.close()
+
+    def update_variable_set(self, set_id: str, name: Optional[str] = None, variables: Optional[Dict[str, str]] = None) -> None:
+        """Update a variable set."""
+        cursor = self.connection.cursor()
+        try:
+            if name:
+                cursor.execute(
+                    f"UPDATE {self._table('variable_sets')} SET name = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                    (name, set_id),
+                )
+
+            if variables is not None:
+                # Delete existing variables
+                cursor.execute(
+                    f"DELETE FROM {self._table('variable_set_variables')} WHERE variable_set_id = %s",
+                    (set_id,),
+                )
+                # Add new variables
+                for key, value in variables.items():
+                    cursor.execute(
+                        f"INSERT INTO {self._table('variable_set_variables')} (id, variable_set_id, key, value) VALUES (%s, %s, %s, %s)",
+                        (str(uuid.uuid4()), set_id, key, value),
+                    )
+
+            self.connection.commit()
+        finally:
+            cursor.close()
+
+    def delete_variable_set(self, set_id: str) -> None:
+        """Delete a variable set."""
+        cursor = self.connection.cursor()
+        try:
+            cursor.execute(
+                f"DELETE FROM {self._table('variable_set_variables')} WHERE variable_set_id = %s",
+                (set_id,),
+            )
+            cursor.execute(
+                f"DELETE FROM {self._table('variable_set_selections')} WHERE variable_set_id = %s",
+                (set_id,),
+            )
+            cursor.execute(
+                f"DELETE FROM {self._table('variable_set_overrides')} WHERE variable_set_id = %s",
+                (set_id,),
+            )
+            cursor.execute(
+                f"DELETE FROM {self._table('variable_sets')} WHERE id = %s",
+                (set_id,),
+            )
+            self.connection.commit()
+        finally:
+            cursor.close()
+
+    def get_active_variable_sets(self, prompt_id: str) -> List[Dict[str, Any]]:
+        """Get all active variable sets for a prompt, in order."""
+        cursor = self.connection.cursor()
+        try:
+            cursor.execute(
+                f"""
+                SELECT vs.id, vs.name
+                FROM {self._table('variable_set_selections')} vss
+                JOIN {self._table('variable_sets')} vs ON vss.variable_set_id = vs.id
+                WHERE vss.prompt_id = %s
+                ORDER BY vss.list_order
+                """,
+                (prompt_id,),
+            )
+
+            sets = []
+            for row in cursor.fetchall():
+                set_id, name = row
+                cursor.execute(
+                    f"SELECT key, value FROM {self._table('variable_set_variables')} WHERE variable_set_id = %s",
+                    (set_id,),
+                )
+                variables = {r[0]: r[1] for r in cursor.fetchall()}
+                sets.append({"id": set_id, "name": name, "variables": variables})
+            return sets
+        finally:
+            cursor.close()
+
+    def set_active_variable_sets(self, prompt_id: str, set_ids: List[str]) -> None:
+        """Set the active variable sets for a prompt."""
+        cursor = self.connection.cursor()
+        try:
+            # Remove existing selections
+            cursor.execute(
+                f"DELETE FROM {self._table('variable_set_selections')} WHERE prompt_id = %s",
+                (prompt_id,),
+            )
+            # Add new selections in order
+            for order, set_id in enumerate(set_ids):
+                cursor.execute(
+                    f"INSERT INTO {self._table('variable_set_selections')} (id, prompt_id, variable_set_id, list_order) VALUES (%s, %s, %s, %s)",
+                    (str(uuid.uuid4()), prompt_id, set_id, order),
+                )
+            self.connection.commit()
+        finally:
+            cursor.close()
+
+    def get_variable_overrides(self, prompt_id: str, set_id: str) -> Dict[str, str]:
+        """Get override values for a specific set in a prompt."""
+        cursor = self.connection.cursor()
+        try:
+            cursor.execute(
+                f"SELECT key, override_value FROM {self._table('variable_set_overrides')} WHERE prompt_id = %s AND variable_set_id = %s",
+                (prompt_id, set_id),
+            )
+            return {row[0]: row[1] for row in cursor.fetchall()}
+        finally:
+            cursor.close()
+
+    def set_variable_overrides(self, prompt_id: str, set_id: str, overrides: Dict[str, str]) -> None:
+        """Set override values for a specific set in a prompt."""
+        cursor = self.connection.cursor()
+        try:
+            # Remove existing overrides
+            cursor.execute(
+                f"DELETE FROM {self._table('variable_set_overrides')} WHERE prompt_id = %s AND variable_set_id = %s",
+                (prompt_id, set_id),
+            )
+            # Add new overrides
+            for key, value in overrides.items():
+                cursor.execute(
+                    f"INSERT INTO {self._table('variable_set_overrides')} (id, prompt_id, variable_set_id, key, override_value) VALUES (%s, %s, %s, %s, %s)",
+                    (str(uuid.uuid4()), prompt_id, set_id, key, value),
+                )
+            self.connection.commit()
         finally:
             cursor.close()
