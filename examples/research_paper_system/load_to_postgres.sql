@@ -11,8 +11,8 @@
 -- PART 1: INSERT PROMPTS
 -- ============================================================================
 
-INSERT INTO pambl_prompts (name, content, created_at, updated_at) VALUES
-  ('research_paper_generator', '#! Research Paper Generator - Complete System
+INSERT INTO pambl_prompts (id, name, content, created_at, updated_at) VALUES
+  (gen_random_uuid(), 'research_paper_generator', '#! Research Paper Generator - Complete System
 #! This prompt demonstrates variable hierarchy, nested pambl_prompts, and tag-based injection
 
 <paper>
@@ -74,7 +74,7 @@ INSERT INTO pambl_prompts (name, content, created_at, updated_at) VALUES
   </references>
 </paper>', NOW(), NOW()),
 
-  ('abstract_template', '#! Abstract Template - Used by research_paper_generator
+  (gen_random_uuid(), 'abstract_template', '#! Abstract Template - Used by research_paper_generator
 
 This paper investigates [[SUBJECT_AREA]] with a focus on [[FOCUS_AREA]].
 The research addresses [[PROBLEM_STATEMENT]] through [[METHODOLOGY_BRIEF]].
@@ -83,7 +83,7 @@ for [[FIELD_IMPLICATIONS]].
 
 Keywords: [[KEYWORDS]]', NOW(), NOW()),
 
-  ('research_instructions', '#! Instructions for conducting research - Used by research_paper_generator
+  (gen_random_uuid(), 'research_instructions', '#! Instructions for conducting research - Used by research_paper_generator
 
 Instructions for conducting [[SUBJECT_AREA]] research:
 
@@ -100,7 +100,7 @@ Academic Rigor Standard: [[ACADEMIC_RIGOR]]
 
 These guidelines ensure consistency and academic quality across all sections.', NOW(), NOW()),
 
-  ('methodology_template', '#! Methodology Template - Used by research_paper_generator
+  (gen_random_uuid(), 'methodology_template', '#! Methodology Template - Used by research_paper_generator
 
 <methodology>
   <approach>[[METHODOLOGY_BRIEF]]</approach>
@@ -125,7 +125,7 @@ These guidelines ensure consistency and academic quality across all sections.', 
   </validation>
 </methodology>', NOW(), NOW()),
 
-  ('validation_checklist', '#! Validation Checklist - Used by methodology_template
+  (gen_random_uuid(), 'validation_checklist', '#! Validation Checklist - Used by methodology_template
 
 Validation Checklist for [[SUBJECT_AREA]]:
 
@@ -137,7 +137,7 @@ Validation Checklist for [[SUBJECT_AREA]]:
 
 All items must be checked before final submission.', NOW(), NOW()),
 
-  ('reference_guidelines', '#! Reference Guidelines - Used by research_paper_generator
+  (gen_random_uuid(), 'reference_guidelines', '#! Reference Guidelines - Used by research_paper_generator
 
 Reference Guidelines for [[SUBJECT_AREA]]
 
@@ -154,7 +154,7 @@ Example citations in [[SUBJECT_AREA]]:
 
 Ensure all citations are complete with authors, dates, and URLs where applicable.', NOW(), NOW()),
 
-  ('example_ai_research', '#! Case Study: AI in Modern Research
+  (gen_random_uuid(), 'example_ai_research', '#! Case Study: AI in Modern Research
 
 <case_study>
   <title>AI-Assisted Research Acceleration in Computer Science</title>
@@ -182,7 +182,7 @@ Ensure all citations are complete with authors, dates, and URLs where applicable
   </key_insight>
 </case_study>', NOW(), NOW()),
 
-  ('example_biomedical_study', '#! Case Study: AI in Biomedical Research
+  (gen_random_uuid(), 'example_biomedical_study', '#! Case Study: AI in Biomedical Research
 
 <case_study>
   <title>AI-Enhanced Drug Discovery and Protein Analysis</title>
@@ -209,7 +209,7 @@ Ensure all citations are complete with authors, dates, and URLs where applicable
   </impact>
 </case_study>', NOW(), NOW()),
 
-  ('example_social_science', '#! Case Study: AI in Social Science Research
+  (gen_random_uuid(), 'example_social_science', '#! Case Study: AI in Social Science Research
 
 <case_study>
   <title>Natural Language Processing in Survey Data Analysis</title>
@@ -237,7 +237,7 @@ Ensure all citations are complete with authors, dates, and URLs where applicable
   </findings>
 </case_study>', NOW(), NOW()),
 
-  ('foundational_machine_learning', '#! Foundational Concepts: Machine Learning
+  (gen_random_uuid(), 'foundational_machine_learning', '#! Foundational Concepts: Machine Learning
 
 <foundational_concept>
   <topic>Supervised Learning Fundamentals</topic>
@@ -266,7 +266,7 @@ Ensure all citations are complete with authors, dates, and URLs where applicable
   </application_in_research>
 </foundational_concept>', NOW(), NOW()),
 
-  ('foundational_statistics', '#! Foundational Concepts: Statistics
+  (gen_random_uuid(), 'foundational_statistics', '#! Foundational Concepts: Statistics
 
 <foundational_concept>
   <topic>Statistical Hypothesis Testing</topic>
@@ -297,7 +297,7 @@ Ensure all citations are complete with authors, dates, and URLs where applicable
   </research_importance>
 </foundational_concept>', NOW(), NOW()),
 
-  ('foundational_research_ethics', '#! Foundational Concepts: Research Ethics
+  (gen_random_uuid(), 'foundational_research_ethics', '#! Foundational Concepts: Research Ethics
 
 <foundational_concept>
   <topic>Research Ethics and IRB Requirements</topic>
@@ -330,7 +330,7 @@ Ensure all citations are complete with authors, dates, and URLs where applicable
   </special_considerations>
 </foundational_concept>', NOW(), NOW()),
 
-  ('example_citation_ml', '#! Example Citation: Machine Learning
+  (gen_random_uuid(), 'example_citation_ml', '#! Example Citation: Machine Learning
 
 <citation>
   <format>APA 7th Edition</format>
@@ -355,7 +355,7 @@ Ensure all citations are complete with authors, dates, and URLs where applicable
   </citation_tips>
 </citation>', NOW(), NOW()),
 
-  ('example_citation_statistics', '#! Example Citation: Statistics
+  (gen_random_uuid(), 'example_citation_statistics', '#! Example Citation: Statistics
 
 <citation>
   <format>APA 7th Edition</format>
