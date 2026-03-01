@@ -57,12 +57,12 @@ ENV PROMPT_ASSEMBLE_UI=true \
     FLASK_PORT=5000 \
     PYTHONUNBUFFERED=1
 
-# Health check
+# Health check (uses PORT env var, defaults to 8000)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/ || exit 1
+    CMD curl -f http://localhost:${PORT:-8000}/ || exit 1
 
 # Expose port
 EXPOSE 5000
 
-# Default command - start UI server with filesystem source
-CMD ["python", "-c", "from prompt_assemble.sources import FileSystemSource; from prompt_assemble.ui import run_server; source = FileSystemSource('/app/prompts'); run_server(source=source, host='0.0.0.0', port=5000, debug=False)"]
+# Default command - start UI server with filesystem source (respects PORT env var)
+CMD ["python", "-c", "from prompt_assemble.sources import FileSystemSource; from prompt_assemble.ui import run_server; source = FileSystemSource('/app/prompts'); run_server(source=source, host='0.0.0.0', debug=False)"]
