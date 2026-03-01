@@ -4,20 +4,22 @@ import '../styles/ExportModal.css';
 
 interface ExportModalProps {
   allTags: string[];
+  currentPromptName?: string;
   onExport: (filters: { tags: string[]; names: string[] }) => void;
   onClose: () => void;
 }
 
-type ExportType = 'all' | 'tags' | 'names';
+type ExportType = 'current' | 'all' | 'tags' | 'names';
 
 const ExportModal: React.FC<ExportModalProps> = ({
   allTags,
+  currentPromptName,
   onExport,
   onClose,
 }) => {
   const overlayRef = useRef<HTMLDivElement>(null);
   const isMouseDownOnOverlay = useRef(false);
-  const [exportType, setExportType] = useState<ExportType>('all');
+  const [exportType, setExportType] = useState<ExportType>(currentPromptName ? 'current' : 'all');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [searchNames, setSearchNames] = useState('');
 
@@ -32,7 +34,9 @@ const ExportModal: React.FC<ExportModalProps> = ({
   const handleExport = () => {
     const filters = {
       tags: exportType === 'tags' ? selectedTags : [],
-      names: exportType === 'names' ? [searchNames] : [],
+      names: exportType === 'current' && currentPromptName
+        ? [currentPromptName]
+        : (exportType === 'names' ? [searchNames] : []),
     };
     onExport(filters);
     onClose();
@@ -69,6 +73,17 @@ const ExportModal: React.FC<ExportModalProps> = ({
           <div className="form-group">
             <label>Export Type</label>
             <div className="radio-group">
+              {currentPromptName && (
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    value="current"
+                    checked={exportType === 'current'}
+                    onChange={(e) => setExportType(e.target.value as ExportType)}
+                  />
+                  <span>Export Current Prompt: <strong>{currentPromptName}</strong></span>
+                </label>
+              )}
               <label className="radio-option">
                 <input
                   type="radio"
@@ -154,6 +169,7 @@ const ExportModal: React.FC<ExportModalProps> = ({
             className="btn btn-primary"
             onClick={handleExport}
             disabled={
+              (exportType === 'current' && !currentPromptName) ||
               (exportType === 'tags' && selectedTags.length === 0) ||
               (exportType === 'names' && !searchNames.trim())
             }

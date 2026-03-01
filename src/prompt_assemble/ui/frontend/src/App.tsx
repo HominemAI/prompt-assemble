@@ -29,6 +29,9 @@ import VariableSetsSelector from './components/VariableSetsSelector';
 import RenderModal from './components/RenderModal';
 import './App.css';
 
+const lightLogo = '/logos/light_black.svg';
+const darkLogo = '/logos/dark_white.svg';
+
 interface VariableSet {
   id: string;
   name: string;
@@ -763,6 +766,16 @@ You are a helpful assistant specializing in [[DOMAIN]].
       <div className="app-header">
         <div className="app-branding">
           <h1>PAMBL</h1>
+          <div className="branding-byline">
+            by
+            <a href="https://hominem.ai" target="_blank" rel="noopener noreferrer" className="hominem-link">
+              <img
+                src={theme === 'dark' ? darkLogo : lightLogo}
+                alt="HOMINEM"
+                className="hominem-logo"
+              />
+            </a>
+          </div>
         </div>
         {!isOnline && (
           <div
@@ -979,6 +992,7 @@ You are a helpful assistant specializing in [[DOMAIN]].
         <ExportModal
           onExport={exportPrompts}
           allTags={allTags}
+          currentPromptName={activeDoc?.name}
           onClose={() => setShowExport(false)}
         />
       )}

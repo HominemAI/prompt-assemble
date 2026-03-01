@@ -55,9 +55,13 @@ const RenderModal: React.FC<RenderModalProps> = ({
   const [output, setOutput] = useState('');
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [width, setWidth] = useState(900);
+  const [height, setHeight] = useState(600);
+  const [isResizing, setIsResizing] = useState(false);
   const preRef = useRef<HTMLPreElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const isMouseDownOnOverlay = useRef(false);
+  const resizeStartPos = useRef({ x: 0, y: 0, width: 0, height: 0 });
 
   // Get merged variables for a prompt (if it's a document)
   const getPromptVariables = async (promptName: string): Promise<Record<string, string>> => {
@@ -214,7 +218,46 @@ const RenderModal: React.FC<RenderModalProps> = ({
       onClose();
     }
     isMouseDownOnOverlay.current = false;
+    setIsResizing(false);
   };
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    setIsResizing(true);
+    resizeStartPos.current = {
+      x: e.clientX,
+      y: e.clientY,
+      width,
+      height,
+    };
+    e.preventDefault();
+  };
+
+  React.useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - resizeStartPos.current.x;
+      const deltaY = e.clientY - resizeStartPos.current.y;
+
+      const newWidth = Math.max(400, resizeStartPos.current.width + deltaX);
+      const newHeight = Math.max(300, resizeStartPos.current.height + deltaY);
+
+      setWidth(newWidth);
+      setHeight(newHeight);
+    };
+
+    const handleMouseUpGlobal = () => {
+      setIsResizing(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUpGlobal);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUpGlobal);
+    };
+  }, [isResizing]);
 
   const handleCopy = () => {
     const textToCopy = outputFormat === 'json' ? output : output;
@@ -234,7 +277,16 @@ const RenderModal: React.FC<RenderModalProps> = ({
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
     >
-      <div className="modal-content render-modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal-content render-modal"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: `${width}px`,
+          height: `${height}px`,
+          maxWidth: '90vw',
+          maxHeight: '90vh',
+        }}
+      >
         {/* Header */}
         <div className="modal-header render-modal-header">
           <h2>Rendered Output</h2>
@@ -294,6 +346,13 @@ const RenderModal: React.FC<RenderModalProps> = ({
             Close
           </button>
         </div>
+
+        {/* Resize Handle */}
+        <div
+          className="resize-handle"
+          onMouseDown={handleResizeStart}
+          title="Drag to resize"
+        />
       </div>
     </div>
   );
