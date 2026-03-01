@@ -1,4 +1,16 @@
-# Build stage
+# Frontend build stage
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /app/frontend
+
+# Copy frontend source
+COPY src/prompt_assemble/ui/frontend/package*.json ./
+RUN npm ci
+
+COPY src/prompt_assemble/ui/frontend/ .
+RUN npm run build
+
+# Python build stage
 FROM python:3.11-slim AS builder
 
 WORKDIR /app
@@ -13,8 +25,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY setup.py pyproject.toml README.md LICENSE /app/
 COPY src/ /app/src/
 
-# Install prompt-assemble and dependencies
-RUN pip install --no-cache-dir -e .
+# Copy built frontend assets (Vite outputs to ../static from frontend dir)
+COPY --from=frontend-builder /app/static /app/src/prompt_assemble/ui/static
+
+# Install prompt-assemble with UI and database dependencies
+RUN pip install --no-cache-dir -e ".[ui-full]"
 
 # Runtime stage
 FROM python:3.11-slim
