@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { FiX, FiCopy } from 'react-icons/fi';
 import { renderPrompt, formatXml } from '../utils/renderer';
 import { xmlToJson } from '../utils/xmlToJson';
-import { backend } from '../utils/api';
+import { useBackend } from '../contexts/BackendContext';
 import '../styles/RenderModal.css';
 
 interface VariableSet {
@@ -51,6 +51,7 @@ const RenderModal: React.FC<RenderModalProps> = ({
   variableSets = [],
   onClose,
 }) => {
+  const { backend } = useBackend();
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('xml');
   const [renderState, setRenderState] = useState<RenderState>('loading');
   const [output, setOutput] = useState('');

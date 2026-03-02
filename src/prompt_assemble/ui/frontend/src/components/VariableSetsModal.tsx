@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FiX, FiPlus, FiSearch } from 'react-icons/fi';
 import VariableSetEditor from './VariableSetEditor';
-import { backend } from '../utils/api';
+import { useBackend } from '../contexts/BackendContext';
 import '../styles/VariableSetsModal.css';
 
 interface VariableSet {
@@ -24,6 +24,7 @@ interface NameInputState {
 }
 
 const VariableSetsModal: React.FC<VariableSetsModalProps> = ({ isOpen, onClose, onVariableSetsChanged }) => {
+  const { backend } = useBackend();
   const [variableSets, setVariableSets] = useState<VariableSet[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSetId, setSelectedSetId] = useState<string | null>(null);

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FiX } from 'react-icons/fi';
-import { backend } from '../utils/api';
+import { useBackend } from '../contexts/BackendContext';
 import '../styles/DocumentProperties.css';
 
 interface Version {
@@ -25,6 +25,7 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
   onRevert,
   onClose,
 }) => {
+  const { backend } = useBackend();
   const overlayRef = useRef<HTMLDivElement>(null);
   const isMouseDownOnOverlay = useRef(false);
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);

@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { FiX, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
+import { FiX, FiCheckCircle, FiAlertCircle, FiTrash2 } from 'react-icons/fi';
 import { BackendMode } from '../utils/api';
 import ConfirmModal from './ConfirmModal';
 import '../styles/SettingsModal.css';
@@ -21,7 +21,7 @@ interface SettingsModalProps {
   lockedBackendMode?: BackendMode; // If set, backend switching is disabled
 }
 
-type SettingsStep = 'main' | 'switch-warning' | 'folder-select' | 'verifying';
+type SettingsStep = 'main' | 'switch-warning' | 'folder-select' | 'verifying' | 'delete-confirm' | 'delete-verify' | 'delete-success';
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -36,6 +36,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [importData, setImportData] = useState(true);
   const [error, setError] = useState<string>('');
   const [progress, setProgress] = useState<string>('');
+  const [deleteConfirmText, setDeleteConfirmText] = useState<string>('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleBackendToggle = (newMode: BackendMode) => {
     if (newMode === currentBackendMode) return;
@@ -73,6 +75,130 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     setStep('main');
     setError('');
     setProgress('');
+    setDeleteConfirmText('');
+  };
+
+  const handleDeleteAllData = async () => {
+    console.log('Delete handler called', { deleteConfirmText });
+    setIsDeleting(true);
+    try {
+      console.log('1. Setting progress');
+      setProgress('Deleting all data...');
+
+      // Clear IndexedDB - delete known databases
+      console.log('2. Starting IndexedDB deletion');
+      const dbNames = ['prompts', 'prompt-assemble'];
+      for (const dbName of dbNames) {
+        console.log(`  Deleting database: ${dbName}`);
+        await new Promise<void>((resolve) => {
+          let resolved = false;
+          const timeout = setTimeout(() => {
+            if (!resolved) {
+              console.log(`  ⏱ Timeout for ${dbName}, moving on`);
+              resolved = true;
+              resolve();
+            }
+          }, 1000);
+
+          const deleteRequest = indexedDB.deleteDatabase(dbName);
+          deleteRequest.onsuccess = () => {
+            if (!resolved) {
+              console.log(`  ✓ Deleted ${dbName} successfully`);
+              resolved = true;
+              clearTimeout(timeout);
+              resolve();
+            }
+          };
+          deleteRequest.onerror = () => {
+            if (!resolved) {
+              console.log(`  ✗ Error deleting ${dbName}:`, deleteRequest.error);
+              resolved = true;
+              clearTimeout(timeout);
+              resolve();
+            }
+          };
+          deleteRequest.onblocked = () => {
+            console.warn(`  ⚠ Delete blocked for ${dbName}`);
+          };
+        });
+      }
+
+      // Verify deletion
+      console.log('  Verifying deletion...');
+      if (window.indexedDB.databases) {
+        const remainingDbs = await window.indexedDB.databases();
+        console.log(`  Remaining databases: ${remainingDbs.map(db => db.name).join(', ')}`);
+      }
+
+      // Also try to delete any databases found via databases() API if available
+      console.log('3. Checking databases() API');
+      if (window.indexedDB.databases) {
+        try {
+          const dbs = await window.indexedDB.databases();
+          console.log(`  Found ${dbs.length} databases`);
+          for (const db of dbs) {
+            if (db.name && !dbNames.includes(db.name)) {
+              console.log(`  Deleting: ${db.name}`);
+              await new Promise<void>((resolve) => {
+                let resolved = false;
+                const timeout = setTimeout(() => {
+                  if (!resolved) {
+                    console.log(`  ⏱ Timeout for ${db.name}, moving on`);
+                    resolved = true;
+                    resolve();
+                  }
+                }, 1000);
+
+                const deleteRequest = indexedDB.deleteDatabase(db.name);
+                deleteRequest.onsuccess = () => {
+                  if (!resolved) {
+                    console.log(`  ✓ Deleted ${db.name}`);
+                    resolved = true;
+                    clearTimeout(timeout);
+                    resolve();
+                  }
+                };
+                deleteRequest.onerror = () => {
+                  if (!resolved) {
+                    console.log(`  ✗ Error deleting ${db.name}`);
+                    resolved = true;
+                    clearTimeout(timeout);
+                    resolve();
+                  }
+                };
+                deleteRequest.onblocked = () => {
+                  console.warn(`  ⚠ Delete blocked for ${db.name}`);
+                };
+              });
+            }
+          }
+        } catch (err) {
+          console.warn('Could not enumerate databases:', err);
+        }
+      }
+
+      // Clear localStorage
+      console.log('4. Clearing localStorage');
+      localStorage.clear();
+
+      // Clear sessionStorage
+      console.log('5. Clearing sessionStorage');
+      sessionStorage.clear();
+
+      console.log('6. Resetting UI state');
+      setProgress('');
+      setError('');
+      setDeleteConfirmText('');
+      setIsDeleting(false);
+      setStep('delete-success');
+      console.log('7. Deletion complete - waiting for user to reload');
+    } catch (err) {
+      console.error('Delete error:', err);
+      console.error('Error stack:', err instanceof Error ? err.stack : 'No stack');
+      setIsDeleting(false);
+      setError(err instanceof Error ? err.message : 'Failed to delete data');
+      setStep('delete-confirm');
+    }
   };
 
   if (!isOpen) return null;
@@ -162,6 +288,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     <FiCheckCircle className="active-indicator" />
                   )}
                 </div>
+              </div>
+
+              <div className="danger-zone">
+                <h3>⚠️ Danger Zone</h3>
+                <p>Delete all local browser data including prompts, variable sets, and history.</p>
+                <button
+                  className="btn btn-danger"
+                  onClick={() => setStep('delete-confirm')}
+                >
+                  <FiTrash2 size={18} />
+                  Delete All Local Data
+                </button>
               </div>
 
               <div className="settings-footer">
@@ -287,6 +425,125 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="progress-spinner" />
               <h3>Setting up storage...</h3>
               {progress && <p className="progress-message">{progress}</p>}
+            </div>
+          </div>
+        )}
+
+        {step === 'delete-confirm' && (
+          <div className="settings-body">
+            <div className="warning-section">
+              <div className="warning-icon">
+                <FiAlertCircle size={32} />
+              </div>
+              <h3>Delete All Local Data?</h3>
+              <div className="warning-content">
+                <div className="warning-box">
+                  <p>
+                    <strong>⚠️ This action cannot be undone!</strong>
+                  </p>
+                  <ul>
+                    <li>All prompts will be permanently deleted</li>
+                    <li>All variable sets will be removed</li>
+                    <li>All version history will be erased</li>
+                    <li>Bookmarks and preferences will be cleared</li>
+                  </ul>
+                </div>
+                {error && <div className="error-message">{error}</div>}
+              </div>
+              <div className="settings-footer">
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleCancel}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-danger"
+                  onClick={() => setStep('delete-verify')}
+                >
+                  I Understand, Delete Data
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 'delete-verify' && (
+          <div className="settings-body">
+            <div className="warning-section">
+              <div className="warning-icon">
+                <FiAlertCircle size={32} />
+              </div>
+              <h3>Confirm Deletion</h3>
+              <div className="warning-content">
+                <p className="delete-verify-label">
+                  <strong>Type the following text to confirm deletion:</strong>
+                </p>
+                <code className="delete-verify-code">
+                  iamdeletingallmydata
+                </code>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  onPaste={(e) => {
+                    e.preventDefault();
+                    return false;
+                  }}
+                  placeholder="Type the text above to confirm..."
+                  className="delete-verify-input"
+                  autoFocus
+                />
+                {deleteConfirmText && deleteConfirmText !== 'iamdeletingallmydata' && (
+                  <div style={{ fontSize: '12px', color: '#999', marginBottom: '0.5rem' }}>
+                    Text doesn't match (you entered: "{deleteConfirmText}")
+                  </div>
+                )}
+                {error && <div className="error-message">{error}</div>}
+              </div>
+              <div className="settings-footer">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setStep('delete-confirm')}
+                >
+                  Back
+                </button>
+                <button
+                  className="btn btn-danger"
+                  onClick={(e) => {
+                    console.log('Delete button clicked', { deleteConfirmText, isEnabled: deleteConfirmText.trim() === 'iamdeletingallmydata' });
+                    handleDeleteAllData();
+                  }}
+                  disabled={deleteConfirmText.trim() !== 'iamdeletingallmydata' || isDeleting}
+                  type="button"
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete Everything'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 'delete-success' && (
+          <div className="settings-body">
+            <div className="warning-section">
+              <div className="warning-icon" style={{ color: '#10b981' }}>
+                <FiCheckCircle size={48} />
+              </div>
+              <h3 style={{ color: '#10b981' }}>Data Deleted Successfully</h3>
+              <div className="warning-content">
+                <p style={{ textAlign: 'center', color: 'var(--color-text-secondary, #666666)', fontSize: '14px' }}>
+                  All local data has been permanently deleted. Check the console for deletion details.
+                </p>
+              </div>
+              <div className="settings-footer">
+                <button
+                  className="btn btn-primary"
+                  onClick={() => window.location.reload()}
+                >
+                  Reload App
+                </button>
+              </div>
             </div>
           </div>
         )}

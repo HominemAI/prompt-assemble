@@ -19,6 +19,7 @@ import {
 import { useTheme } from './hooks/useTheme';
 import { createBackend, BackendMode, PromptBackend } from './utils/api';
 import { migrateBackends } from './utils/migration';
+import { BackendProvider } from './contexts/BackendContext';
 import PromptExplorer from './components/PromptExplorer';
 import EditorPanel from './components/EditorPanel';
 import DocumentProperties from './components/DocumentProperties';
@@ -861,7 +862,8 @@ You are a helpful assistant specializing in [[DOMAIN]].
   const activeDoc = getActiveDocument();
 
   return (
-    <div className="app-container">
+    <BackendProvider backend={backend} backendMode={backendMode}>
+      <div className="app-container">
       {/* Header with Branding and Theme Toggle */}
       <div className="app-header">
         <div className="app-branding">
@@ -1236,6 +1238,7 @@ You are a helpful assistant specializing in [[DOMAIN]].
         lockedBackendMode={lockedBackendMode}
       />
     </div>
+    </BackendProvider>
   );
 };
 
