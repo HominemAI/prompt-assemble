@@ -370,6 +370,18 @@ class DatabaseSource(PromptSource):
 
             prompt_id = row[0]
 
+            # Delete variable set selections (foreign key constraint)
+            cursor.execute(
+                f"DELETE FROM {self._table('variable_set_selections')} WHERE prompt_id = %s",
+                (prompt_id,),
+            )
+
+            # Delete variable set overrides (foreign key constraint)
+            cursor.execute(
+                f"DELETE FROM {self._table('variable_set_overrides')} WHERE prompt_id = %s",
+                (prompt_id,),
+            )
+
             # Delete tags
             cursor.execute(
                 f"DELETE FROM {self._table('prompt_tags')} WHERE prompt_id = %s",
