@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef } from 'react';
-import { FiSearch, FiPlus, FiRefreshCw, FiX, FiCheck, FiCopy } from 'react-icons/fi';
+import { FiSearch, FiPlus, FiRefreshCw, FiX, FiCheck, FiCopy, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import '../styles/PromptExplorer.css';
 
 interface Prompt {
@@ -24,6 +24,8 @@ interface PromptExplorerProps {
   onPromptSelect: (prompt: Prompt) => void;
   onNewPrompt: () => void;
   onRefresh: () => void;
+  sidebarVisible?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 const PromptExplorer: React.FC<PromptExplorerProps> = ({
@@ -39,6 +41,8 @@ const PromptExplorer: React.FC<PromptExplorerProps> = ({
   onPromptSelect,
   onNewPrompt,
   onRefresh,
+  sidebarVisible = true,
+  onToggleSidebar = () => {},
 }) => {
   const tagInputRef = useRef<HTMLInputElement>(null);
   const [selectedOwner, setSelectedOwner] = useState<string>('');
@@ -124,46 +128,59 @@ const PromptExplorer: React.FC<PromptExplorerProps> = ({
     <div className="prompt-explorer">
       {/* Header */}
       <div className="explorer-header">
-        <h2>Prompts</h2>
+        <h2 style={{ display: sidebarVisible ? 'block' : 'none' }}>Prompts</h2>
         <div className="explorer-actions">
+          {sidebarVisible && (
+            <>
+              <button
+                className="btn btn-icon"
+                onClick={onNewPrompt}
+                title="Create new prompt"
+              >
+                <FiPlus size={18} />
+              </button>
+              <button
+                className="btn btn-icon"
+                onClick={onRefresh}
+                disabled={loading}
+                title="Refresh prompts"
+              >
+                <FiRefreshCw size={18} className={loading ? 'spinner' : ''} />
+              </button>
+            </>
+          )}
           <button
             className="btn btn-icon"
-            onClick={onNewPrompt}
-            title="Create new prompt"
+            onClick={onToggleSidebar}
+            title={sidebarVisible ? 'Hide sidebar' : 'Show sidebar'}
           >
-            <FiPlus size={18} />
-          </button>
-          <button
-            className="btn btn-icon"
-            onClick={onRefresh}
-            disabled={loading}
-            title="Refresh prompts"
-          >
-            <FiRefreshCw size={18} className={loading ? 'spinner' : ''} />
+            {sidebarVisible ? <FiChevronLeft size={18} /> : <FiChevronRight size={18} />}
           </button>
         </div>
       </div>
 
-      {/* Search */}
-      <div className="explorer-search">
-        <div className="search-input-wrapper">
-          <FiSearch size={16} />
-          <input
-            type="text"
-            placeholder="Search prompts..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.currentTarget.blur();
-              }
-            }}
-            className="search-input"
-          />
-        </div>
-      </div>
+      {/* Search - Hide when collapsed */}
+      {sidebarVisible && (
+        <>
+          <div className="explorer-search">
+            <div className="search-input-wrapper">
+              <FiSearch size={16} />
+              <input
+                type="text"
+                placeholder="Search prompts..."
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur();
+                  }
+                }}
+                className="search-input"
+              />
+            </div>
+          </div>
 
-      {/* Owner and Tags Filter */}
+          {/* Owner and Tags Filter */}
       <div className="filters-section">
         {/* Owner Filter */}
         <div className="filter-row">
@@ -358,7 +375,9 @@ const PromptExplorer: React.FC<PromptExplorerProps> = ({
             );
           })
         )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

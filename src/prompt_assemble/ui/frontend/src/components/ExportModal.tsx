@@ -155,8 +155,8 @@ const ExportModal: React.FC<ExportModalProps> = ({
           <div className="export-info">
             <p className="info-title">📦 Export Format</p>
             <p className="info-text">
-              Exports will be saved as a JSON file containing all selected prompts
-              with their content, metadata, tags, and descriptions.
+              Single prompt will be saved as a <code>.prompt</code> file.<br />
+              Multiple prompts will be saved as a <code>.zip</code> file containing individual <code>.prompt</code> files.
             </p>
           </div>
         </div>
@@ -174,7 +174,7 @@ const ExportModal: React.FC<ExportModalProps> = ({
               (exportType === 'names' && !searchNames.trim())
             }
           >
-            Export as JSON
+            Export as .prompt File(s)
           </button>
         </div>
       </div>

@@ -76,6 +76,14 @@ def create_app(source=None, config=None):
             logger.warning("Static files not built. Run: npm run build in the frontend directory")
             return _get_index_html()
 
+    @app.route("/favicon.svg")
+    def serve_favicon():
+        """Serve favicon at root level"""
+        favicon_path = STATIC_DIR / "favicon.svg"
+        if favicon_path.exists():
+            return app.send_static_file("favicon.svg")
+        return "", 404
+
     @app.route("/assets/<path:filename>")
     def serve_assets(filename):
         """Serve static assets (JS, CSS, etc.)"""

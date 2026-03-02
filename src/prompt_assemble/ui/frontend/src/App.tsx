@@ -107,6 +107,7 @@ const App: React.FC = () => {
   const [showVariableSetsModal, setShowVariableSetsModal] = useState(false);
   const [showVariableSetSelector, setShowVariableSetSelector] = useState(false);
   const [showRenderModal, setShowRenderModal] = useState(false);
+  const [sidebarVisible, setSidebarVisible] = useState(true);
 
   // Modal state
   const [alertModal, setAlertModal] = useState<{ isOpen: boolean; title: string; message: string }>({
@@ -740,22 +741,52 @@ You are a helpful assistant specializing in [[DOMAIN]].
 
       if (response.ok) {
         const data = await response.json();
-        downloadJSON(data, 'prompts-export.json');
+        const prompts = data.export || [];
+
+        if (prompts.length === 1) {
+          // Single prompt - download as .prompt file
+          downloadPromptFile(prompts[0]);
+        } else if (prompts.length > 1) {
+          // Multiple prompts - download as zip with .prompt files
+          downloadPromptZip(prompts);
+        }
       }
     } catch (error) {
       console.error('Error exporting:', error);
     }
   };
 
-  const downloadJSON = (data: any, filename: string) => {
-    const json = JSON.stringify(data, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
+  const downloadPromptFile = (prompt: any) => {
+    const content = prompt.content || '';
+    const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = filename;
+    link.download = `${prompt.name}.prompt`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  const downloadPromptZip = async (prompts: any[]) => {
+    try {
+      const { default: JSZip } = await import('jszip');
+      const zip = new JSZip();
+
+      prompts.forEach((prompt) => {
+        const content = prompt.content || '';
+        zip.file(`${prompt.name}.prompt`, content);
+      });
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'prompts-export.zip';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error creating zip file:', error);
+    }
   };
 
   const activeDoc = getActiveDocument();
@@ -803,7 +834,7 @@ You are a helpful assistant specializing in [[DOMAIN]].
       </div>
       <div className="app-layout">
         {/* Left Panel - Prompt Explorer */}
-        <div className="left-panel">
+        <div className={`left-panel ${sidebarVisible ? '' : 'collapsed'}`}>
           <PromptExplorer
             prompts={prompts}
             allTags={allTags}
@@ -817,6 +848,8 @@ You are a helpful assistant specializing in [[DOMAIN]].
             onPromptSelect={handlePromptSelect}
             onNewPrompt={createNewDocument}
             onRefresh={loadPrompts}
+            sidebarVisible={sidebarVisible}
+            onToggleSidebar={() => setSidebarVisible(!sidebarVisible)}
           />
         </div>
 

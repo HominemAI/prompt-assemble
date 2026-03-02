@@ -48,7 +48,11 @@
 
 /* Panels */
 .left-panel {
-  @apply w-80 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden;
+  @apply w-80 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden transition-all duration-300;
+}
+
+.left-panel.collapsed {
+  @apply w-16;
 }
 
 .right-panel {
