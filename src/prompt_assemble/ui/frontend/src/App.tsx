@@ -900,18 +900,22 @@ You are a helpful assistant specializing in [[DOMAIN]].
           Variables
         </button>
         <button
+          className="btn-icon"
+          onClick={() => {
+            console.log('[App] Feedback button clicked');
+            setShowFeedback(true);
+          }}
+          title="Send Feedback"
+        >
+          <FiMessageSquare size={20} />
+          Feedback
+        </button>
+        <button
           className="btn-theme-toggle"
           onClick={toggleTheme}
           title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
         >
           {theme === 'light' ? <FiMoon size={20} /> : <FiSun size={20} />}
-        </button>
-        <button
-          className="btn-icon"
-          onClick={() => setShowFeedback(true)}
-          title="Send Feedback"
-        >
-          <FiMessageSquare size={20} />
         </button>
         <button
           className="btn-icon"
