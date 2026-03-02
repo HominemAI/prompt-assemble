@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FiX, FiPlus, FiSearch } from 'react-icons/fi';
 import VariableSetEditor from './VariableSetEditor';
+import { backend } from '../utils/api';
 import '../styles/VariableSetsModal.css';
 
 interface VariableSet {
@@ -48,14 +49,8 @@ const VariableSetsModal: React.FC<VariableSetsModalProps> = ({ isOpen, onClose, 
 
   const loadVariableSets = async () => {
     try {
-      const response = await fetch('/api/variable-sets');
-      if (response.ok) {
-        const data = await response.json();
-        setVariableSets(data.variable_sets || []);
-      } else {
-        // Fall back to localStorage if server fails
-        loadFromLocalStorage();
-      }
+      const sets = await backend.listVariableSets();
+      setVariableSets(sets);
     } catch (error) {
       console.error('Error loading variable sets:', error);
       // Fall back to localStorage if fetch fails
@@ -78,14 +73,7 @@ const VariableSetsModal: React.FC<VariableSetsModalProps> = ({ isOpen, onClose, 
 
   const saveVariableSetToServer = async (set: VariableSet) => {
     try {
-      const response = await fetch('/api/variable-sets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(set),
-      });
-      if (!response.ok) {
-        console.error('Failed to save variable set');
-      }
+      await backend.saveVariableSet(set);
       // Reload after save
       await loadVariableSets();
       // Notify parent
@@ -99,12 +87,7 @@ const VariableSetsModal: React.FC<VariableSetsModalProps> = ({ isOpen, onClose, 
 
   const deleteVariableSetFromServer = async (setId: string) => {
     try {
-      const response = await fetch(`/api/variable-sets/${setId}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) {
-        console.error('Failed to delete variable set');
-      }
+      await backend.deleteVariableSet(setId);
       // Reload after delete
       await loadVariableSets();
       // Notify parent

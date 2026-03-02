@@ -14,8 +14,11 @@ import {
   FiCode,
   FiClock,
   FiPlay,
+  FiSettings,
 } from 'react-icons/fi';
 import { useTheme } from './hooks/useTheme';
+import { createBackend, BackendMode, PromptBackend } from './utils/api';
+import { migrateBackends } from './utils/migration';
 import PromptExplorer from './components/PromptExplorer';
 import EditorPanel from './components/EditorPanel';
 import DocumentProperties from './components/DocumentProperties';
@@ -27,6 +30,7 @@ import ConfirmModal from './components/ConfirmModal';
 import VariableSetsModal from './components/VariableSetsModal';
 import VariableSetsSelector from './components/VariableSetsSelector';
 import RenderModal from './components/RenderModal';
+import SettingsModal from './components/SettingsModal';
 import './App.css';
 
 const lightLogo = '/logos/light_black.svg';
@@ -108,6 +112,21 @@ const App: React.FC = () => {
   const [showVariableSetSelector, setShowVariableSetSelector] = useState(false);
   const [showRenderModal, setShowRenderModal] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
+
+  // Backend management
+  const [backendMode, setBackendMode] = useState<BackendMode>(() => {
+    if (typeof window !== 'undefined') {
+      return (window.localStorage.getItem('prompt-assemble-backend') as BackendMode) || 'local';
+    }
+    return 'local';
+  });
+
+  const [backend, setBackendInstance] = useState<PromptBackend>(
+    createBackend({ mode: backendMode })
+  );
+
+  const [showSettings, setShowSettings] = useState(false);
+  const [isBackendSwitching, setIsBackendSwitching] = useState(false);
 
   // Modal state
   const [alertModal, setAlertModal] = useState<{ isOpen: boolean; title: string; message: string }>({
@@ -191,16 +210,14 @@ const App: React.FC = () => {
   const loadPrompts = async (showLoadingState = false) => {
     if (showLoadingState) setLoading(true);
     try {
-      const response = await fetch('/api/prompts');
-      const data = await response.json();
-      const loadedPrompts = data.prompts || [];
+      const loadedPrompts = await backend.listPrompts();
 
       // Filter out known invalid prompts (Untitled, empty names) - case insensitive
       const validPrompts = loadedPrompts.filter(
-        (p: Prompt) => p.name && p.name.toLowerCase() !== 'untitled' && p.name.trim()
+        (p) => p.name && p.name.toLowerCase() !== 'untitled' && p.name.trim()
       );
 
-      setPrompts(validPrompts);
+      setPrompts(validPrompts as Prompt[]);
     } catch (error) {
       console.error('Error loading prompts:', error);
     } finally {
@@ -210,9 +227,8 @@ const App: React.FC = () => {
 
   const loadTags = async () => {
     try {
-      const response = await fetch('/api/tags');
-      const data = await response.json();
-      setAllTags(data.tags || []);
+      const tags = await backend.listTags();
+      setAllTags(tags);
     } catch (error) {
       console.error('Error loading tags:', error);
     }
@@ -220,9 +236,8 @@ const App: React.FC = () => {
 
   const loadVariableSets = async () => {
     try {
-      const response = await fetch('/api/variable-sets');
-      const data = await response.json();
-      setVariableSets(data.variable_sets || []);
+      const sets = await backend.listVariableSets();
+      setVariableSets(sets);
     } catch (error) {
       console.error('Error loading variable sets:', error);
     }
@@ -253,6 +268,73 @@ const App: React.FC = () => {
     }
 
     return merged;
+  };
+
+  /**
+   * Handle backend mode switching with data migration support.
+   */
+  const handleBackendChange = async (newMode: BackendMode, importData: boolean = false) => {
+    setIsBackendSwitching(true);
+    try {
+      const oldBackend = backend;
+      const newBackend = createBackend({ mode: newMode });
+
+      // If switching to filesystem, ask user to select folder
+      if (newMode === 'filesystem') {
+        const fsBackend = newBackend as any;
+        const folderSelected = await fsBackend.selectAndVerifyFolder(importData);
+        if (!folderSelected) {
+          setIsBackendSwitching(false);
+          return;
+        }
+      }
+
+      // Migrate data if requested
+      if (importData && newMode === 'filesystem') {
+        console.log('Migrating data from old backend to filesystem...');
+        await migrateBackends(oldBackend, newBackend, (msg) => {
+          console.log(`Migration: ${msg}`);
+        });
+      }
+
+      // Update backend
+      setBackendInstance(newBackend);
+      setBackendMode(newMode);
+
+      // Persist preference
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('prompt-assemble-backend', newMode);
+      }
+
+      // Reload all data from new backend
+      console.log('Reloading data from new backend...');
+      const newPrompts = await newBackend.listPrompts();
+      setPrompts(newPrompts as Prompt[]);
+
+      const newTags = await newBackend.listTags();
+      setAllTags(newTags);
+
+      const newVarSets = await newBackend.listVariableSets();
+      setVariableSets(newVarSets);
+
+      // Show success message
+      setAlertModal({
+        isOpen: true,
+        title: 'Backend Updated',
+        message: `Successfully switched to ${newMode === 'filesystem' ? 'filesystem' : 'browser'} storage.`,
+      });
+
+      setShowSettings(false);
+    } catch (error) {
+      console.error('Error switching backend:', error);
+      setAlertModal({
+        isOpen: true,
+        title: 'Backend Switch Failed',
+        message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      });
+    } finally {
+      setIsBackendSwitching(false);
+    }
   };
 
   const createNewDocument = () => {
@@ -395,90 +477,66 @@ You are a helpful assistant specializing in [[DOMAIN]].
     }
 
     try {
-      const response = await fetch(`/api/prompts/${docName}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: contentToSave,
-          metadata: {
-            ...doc.metadata,
-            revisionComments: revisionComment,
-          },
-          isBackendSave: isManualSave,
-        }),
+      await backend.savePrompt(docName, {
+        content: contentToSave,
+        metadata: {
+          ...doc.metadata,
+          revisionComments: revisionComment,
+        },
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`[saveDocument] Backend save successful for ${id}, isManualSave: ${isManualSave}`);
-        // Manual saves clear isDirty, auto-saves do not
-        setDocuments(
-          documents.map((d) => {
-            if (d.id === id) {
-              const newIsDirty = isManualSave ? false : d.isDirty;
-              console.log(`[saveDocument] Updating doc ${id}: savedAt: ${data.timestamp}, isDirty: ${d.isDirty} → ${newIsDirty} (isManualSave: ${isManualSave})`);
-              return {
-                ...d,
-                isDirty: newIsDirty,
-                savedAt: data.timestamp,
-                metadata: {
-                  ...d.metadata,
-                  revisionComments: revisionComment,
-                },
-              };
-            }
-            return d;
-          })
-        );
-        // Remove from pending if it was queued
-        pendingSavesRef.current.delete(id);
-        // Only refresh prompts on manual saves to avoid overwriting user typing during auto-save
-        if (isManualSave) {
-          loadPrompts(false);
-        }
-
-        // Save variable set subscriptions if this is a database-backed document
-        const varSetIds = doc.variableSetIds || [];
-        const overrides = doc.variableOverrides || {};
-        if (varSetIds.length > 0 || Object.keys(overrides).length > 0) {
-          try {
-            await fetch(`/api/prompts/${encodeURIComponent(docName)}/variable-sets`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                variableSetIds: varSetIds,
-                overrides: overrides,
-              }),
-            });
-          } catch (e) {
-            console.warn('Failed to save variable set subscriptions:', e);
+      const timestamp = new Date().toISOString();
+      console.log(`[saveDocument] Backend save successful for ${id}, isManualSave: ${isManualSave}`);
+      // Manual saves clear isDirty, auto-saves do not
+      setDocuments(
+        documents.map((d) => {
+          if (d.id === id) {
+            const newIsDirty = isManualSave ? false : d.isDirty;
+            console.log(`[saveDocument] Updating doc ${id}: savedAt: ${timestamp}, isDirty: ${d.isDirty} → ${newIsDirty} (isManualSave: ${isManualSave})`);
+            return {
+              ...d,
+              isDirty: newIsDirty,
+              savedAt: timestamp,
+              metadata: {
+                ...d.metadata,
+                revisionComments: revisionComment,
+              },
+            };
           }
-        }
-      } else {
-        console.error('Save failed:', response.status, response.statusText);
-        // Queue for retry if offline
-        if (!isOnline) {
-          pendingSavesRef.current.add(id);
-          console.log('Queued for retry when online:', id);
-        } else {
-          setAlertModal({
-            isOpen: true,
-            title: 'Save Failed',
-            message: `Failed to save: ${response.statusText}`,
+          return d;
+        })
+      );
+      // Remove from pending if it was queued
+      pendingSavesRef.current.delete(id);
+      // Only refresh prompts on manual saves to avoid overwriting user typing during auto-save
+      if (isManualSave) {
+        loadPrompts(false);
+      }
+
+      // Save variable set subscriptions if this is a database-backed document
+      const varSetIds = doc.variableSetIds || [];
+      const overrides = doc.variableOverrides || {};
+      if (varSetIds.length > 0 || Object.keys(overrides).length > 0) {
+        try {
+          await backend.savePromptVariableSets(docName, {
+            variableSetIds: varSetIds,
+            overrides: overrides,
           });
+        } catch (e) {
+          console.warn('Failed to save variable set subscriptions:', e);
         }
       }
     } catch (error) {
-      console.error('Error saving document:', error);
-      // Queue for retry if offline or network error
-      if (!isOnline || error instanceof TypeError) {
+      console.error('Save failed:', error);
+      // Queue for retry if offline
+      if (!isOnline) {
         pendingSavesRef.current.add(id);
         console.log('Queued for retry when online:', id);
       } else {
         setAlertModal({
           isOpen: true,
-          title: 'Save Error',
-          message: 'Error saving document. Check console for details.',
+          title: 'Save Failed',
+          message: `Failed to save: ${error}`,
         });
       }
     } finally {
@@ -548,10 +606,10 @@ You are a helpful assistant specializing in [[DOMAIN]].
               }
 
               // For saved documents, delete from backend first
-              const response = await fetch(`/api/prompts/${encodeURIComponent(doc.name)}`, { method: 'DELETE' });
-
-              if (!response.ok) {
-                console.error('Delete response:', response.status, response.statusText);
+              try {
+                await backend.deletePrompt(doc.name);
+              } catch (deleteError) {
+                console.error('Delete error:', deleteError);
                 // Still remove from UI even if backend delete fails
                 setDocuments(documents.filter((d) => d.id !== id));
                 if (activeDocId === id) {
@@ -564,7 +622,7 @@ You are a helpful assistant specializing in [[DOMAIN]].
                 setAlertModal({
                   isOpen: true,
                   title: 'Delete Removed from UI',
-                  message: `Document removed from editor. Note: Backend delete failed (${response.statusText}). Refresh to verify.`,
+                  message: `Document removed from editor. Note: Backend delete failed (${deleteError}). Refresh to verify.`,
                 });
                 return;
               }
@@ -692,35 +750,25 @@ You are a helpful assistant specializing in [[DOMAIN]].
     let content = prompt.content;
     if (!content) {
       try {
-        const response = await fetch(`/api/prompts/${prompt.name}`);
-        if (response.ok) {
-          const data = await response.json();
-          content = data.content || '';
-        } else if (response.status === 404) {
+        const data = await backend.getPrompt(prompt.name);
+        content = data.content || '';
+      } catch (error) {
+        console.error('Error loading prompt content:', error);
+        if ((error as Error).message.includes('404')) {
           setAlertModal({
             isOpen: true,
             title: 'Prompt Not Found',
-            message: `Prompt "${prompt.name}" not found on server. It may have been deleted.`,
+            message: `Prompt "${prompt.name}" not found. It may have been deleted.`,
           });
           // Remove this prompt from the list immediately
           setPrompts(prompts.filter((p) => p.name !== prompt.name));
-          return;
         } else {
-          console.error('Error loading prompt:', response.status);
           setAlertModal({
             isOpen: true,
-            title: 'Load Failed',
-            message: `Failed to load prompt: ${response.statusText}`,
+            title: 'Load Error',
+            message: 'Error loading prompt. Check console for details.',
           });
-          return;
         }
-      } catch (error) {
-        console.error('Error loading prompt content:', error);
-        setAlertModal({
-          isOpen: true,
-          title: 'Load Error',
-          message: 'Error loading prompt. Check console for details.',
-        });
         return;
       }
     }
@@ -743,23 +791,21 @@ You are a helpful assistant specializing in [[DOMAIN]].
 
   const exportPrompts = async (filters: { tags: string[]; names: string[] }) => {
     try {
-      const response = await fetch('/api/export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(filters),
+      const blob = await backend.exportPrompts({
+        tags: filters.tags.length > 0 ? filters.tags : undefined,
+        namePattern: filters.names.length > 0 ? filters.names.join('|') : undefined,
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const prompts = data.export || [];
+      // Parse the JSON blob to get prompts
+      const json = await blob.text();
+      const prompts = JSON.parse(json);
 
-        if (prompts.length === 1) {
-          // Single prompt - download as .prompt file
-          downloadPromptFile(prompts[0]);
-        } else if (prompts.length > 1) {
-          // Multiple prompts - download as zip with .prompt files
-          downloadPromptZip(prompts);
-        }
+      if (prompts.length === 1) {
+        // Single prompt - download as .prompt file
+        downloadPromptFile(prompts[0]);
+      } else if (prompts.length > 1) {
+        // Multiple prompts - download as zip with .prompt files
+        downloadPromptZip(prompts);
       }
     } catch (error) {
       console.error('Error exporting:', error);
@@ -840,6 +886,13 @@ You are a helpful assistant specializing in [[DOMAIN]].
           title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
         >
           {theme === 'light' ? <FiMoon size={20} /> : <FiSun size={20} />}
+        </button>
+        <button
+          className="btn-icon"
+          onClick={() => setShowSettings(true)}
+          title="Storage Settings"
+        >
+          <FiSettings size={20} />
         </button>
       </div>
       <div className="app-layout">
@@ -1066,19 +1119,11 @@ You are a helpful assistant specializing in [[DOMAIN]].
 
             if (activeDocId && activeDoc) {
               try {
-                const response = await fetch(`/api/prompts/${encodeURIComponent(activeDoc.name)}/revert/${selectedVersion.version}`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                });
+                await backend.revertPrompt(activeDoc.name, selectedVersion.version);
+                console.log(`[App] Revert successful: reverted to version ${selectedVersion.version}`);
 
-                if (!response.ok) {
-                  const error = await response.json();
-                  console.error(`[App] Revert failed: ${error.error}`);
-                  return;
-                }
-
-                const data = await response.json();
-                console.log(`[App] Revert successful: new version ${data.newVersion}`);
+                // Reload the prompt to get the reverted content
+                const revertedPrompt = await backend.getPrompt(activeDoc.name);
 
                 // Update document state with the reverted content
                 // We use setDocuments directly instead of updateDocument because
@@ -1088,12 +1133,12 @@ You are a helpful assistant specializing in [[DOMAIN]].
                     if (d.id === activeDocId) {
                       return {
                         ...d,
-                        content: data.content,
+                        content: revertedPrompt.content,
                         metadata: {
                           ...d.metadata,
-                          revisionComments: data.revisionComment,
+                          revisionComments: `Reverted to v${selectedVersion.version}`,
                         },
-                        savedAt: data.timestamp,
+                        savedAt: new Date().toISOString(),
                         isDirty: false,
                       };
                     }
@@ -1166,6 +1211,15 @@ You are a helpful assistant specializing in [[DOMAIN]].
         confirmText={confirmModal.confirmText}
         cancelText={confirmModal.cancelText}
         isDangerous={confirmModal.isDangerous}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        currentBackendMode={backendMode}
+        onBackendChange={handleBackendChange}
+        isLoading={isBackendSwitching}
       />
     </div>
   );

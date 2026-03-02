@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FiX } from 'react-icons/fi';
+import { backend } from '../utils/api';
 import '../styles/DocumentProperties.css';
 
 interface Version {
@@ -36,17 +37,15 @@ const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
     const fetchHistory = async () => {
       try {
         setLoading(true);
-        const url = `/api/prompts/${encodeURIComponent(promptName)}/history`;
-        console.log(`[VersionHistoryModal] Fetching history from: ${url}`);
-        const response = await fetch(url);
-        console.log(`[VersionHistoryModal] Response status: ${response.status}`);
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch history: ${response.statusText}`);
-        }
-        const data = await response.json();
-        console.log(`[VersionHistoryModal] Received ${data.versions?.length || 0} versions:`, data.versions);
-        setVersions(data.versions || []);
+        console.log(`[VersionHistoryModal] Fetching history for: ${promptName}`);
+        const history = await backend.getPromptHistory(promptName);
+        console.log(`[VersionHistoryModal] Received ${history?.length || 0} versions:`, history);
+        setVersions(history.map(entry => ({
+          version: entry.version,
+          content: '', // Content will be loaded on revert
+          createdAt: entry.timestamp,
+          revisionComment: entry.comment,
+        })));
         setError(null);
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Failed to fetch version history';

@@ -233,3 +233,122 @@ class TestPromptProviderRecursion:
             provider.render(
                 "test", variables={"VAR": "[[VAR]]"}, max_depth=5
             )
+
+
+class TestCrossSigilNesting:
+    """Test interactions between different sigil types."""
+
+    def test_prompt_tag_result_has_variable(self, provider, mock_source):
+        """Test PROMPT_TAG result containing variables."""
+        mock_source.add_prompt("greeting", "Hello [[NAME]]", tags=["intro"])
+        mock_source.add_prompt("main", "[[PROMPT_TAG: intro]]")
+
+        result = provider.render("main", variables={"NAME": "Alice"})
+        assert result == "Hello Alice"
+
+    def test_prompt_tag_result_has_prompt(self, provider, mock_source):
+        """Test PROMPT_TAG result containing another PROMPT: sigil."""
+        mock_source.add_prompt("base", "Base text")
+        mock_source.add_prompt("with_prompt", "[[PROMPT: base]] extended", tags=["combo"])
+        mock_source.add_prompt("main", "[[PROMPT_TAG: combo]]")
+
+        result = provider.render("main")
+        assert result == "Base text extended"
+
+    def test_prompt_body_uses_prompt_tag(self, provider, mock_source):
+        """Test injected prompt containing PROMPT_TAG: sigil."""
+        mock_source.add_prompt("tag1", "Content 1", tags=["section"])
+        mock_source.add_prompt("tag2", "Content 2", tags=["section"])
+        mock_source.add_prompt("aggregator", "Sections: [[PROMPT_TAG: section]]")
+        mock_source.add_prompt("main", "[[PROMPT: aggregator]]")
+
+        result = provider.render("main")
+        assert "Content 1" in result
+        assert "Content 2" in result
+
+    def test_prompt_tag_n_greater_than_available(self, provider, mock_source):
+        """Test PROMPT_TAG:N: when N exceeds available results."""
+        mock_source.add_prompt("a", "First", tags=["tag"])
+        mock_source.add_prompt("b", "Second", tags=["tag"])
+        mock_source.add_prompt("main", "[[PROMPT_TAG:10: tag]]")
+
+        result = provider.render("main")
+        assert "First" in result
+        assert "Second" in result
+
+    def test_prompt_tag_limit_zero(self, provider, mock_source):
+        """Test PROMPT_TAG:0: returns empty."""
+        mock_source.add_prompt("a", "Content", tags=["tag"])
+        mock_source.add_prompt("main", "Start [[PROMPT_TAG:0: tag]] End")
+
+        result = provider.render("main")
+        assert result == "Start  End"
+
+    def test_self_referential_raises(self, provider, mock_source):
+        """Test that self-referential PROMPT: raises RecursionError."""
+        mock_source.add_prompt("self", "[[PROMPT: self]]")
+
+        with pytest.raises(RecursionError):
+            provider.render("self", max_depth=5)
+
+    def test_component_resolver_exception(self, provider, mock_source):
+        """Test error handling when component resolver fails."""
+        mock_source.add_prompt("main", "[[PROMPT: missing]]")
+
+        with pytest.raises(ValueError, match="Undefined component"):
+            provider.render("main")
+
+    def test_multi_level_variable_substitution(self, provider, mock_source):
+        """Test variable inside variable inside prompt."""
+        mock_source.add_prompt(
+            "template", "Value: [[RESULT]]"
+        )
+        mock_source.add_prompt(
+            "main", "[[PROMPT: template]]"
+        )
+
+        result = provider.render(
+            "main",
+            variables={"RESULT": "[[INNER]]", "INNER": "final"},
+            recursive=True,
+        )
+        assert result == "Value: final"
+
+    def test_all_variable_types_one_prompt(self, provider, mock_source):
+        """Test serializing all variable types in a single prompt."""
+        mock_source.add_prompt(
+            "main",
+            "str=[[STR]], int=[[INT]], float=[[FLOAT]], bool=[[BOOL]], none=[[NONE]]",
+        )
+
+        result = provider.render(
+            "main",
+            variables={
+                "STR": "hello",
+                "INT": 42,
+                "FLOAT": 3.14,
+                "BOOL": True,
+                "NONE": None,
+            },
+        )
+        assert result == "str=hello, int=42, float=3.14, bool=True, none="
+
+    def test_deeply_nested_cross_sigil_chain(self, provider, mock_source):
+        """Test 4-level deep nesting with multiple sigil types."""
+        # Level 4: simple prompt
+        mock_source.add_prompt("base", "[[VALUE]]", tags=["leaf"])
+
+        # Level 3: prompt that uses PROMPT_TAG
+        mock_source.add_prompt("aggregator", "Result: [[PROMPT_TAG: leaf]]")
+
+        # Level 2: prompt that uses PROMPT
+        mock_source.add_prompt("wrapper", "Wrapped: [[PROMPT: aggregator]]")
+
+        # Level 1: main prompt with variable
+        mock_source.add_prompt("main", "Final: [[PROMPT: wrapper]]")
+
+        result = provider.render(
+            "main",
+            variables={"VALUE": "Deep value"},
+        )
+        assert "Deep value" in result

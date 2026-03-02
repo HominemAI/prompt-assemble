@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { FiX, FiCopy } from 'react-icons/fi';
 import { renderPrompt, formatXml } from '../utils/renderer';
 import { xmlToJson } from '../utils/xmlToJson';
+import { backend } from '../utils/api';
 import '../styles/RenderModal.css';
 
 interface VariableSet {
@@ -114,27 +115,24 @@ const RenderModal: React.FC<RenderModalProps> = ({
         const currentDoc = documents.find((d) => d.content === content);
         if (currentDoc && currentDoc.name) {
           try {
-            const response = await fetch(`/api/prompts/${encodeURIComponent(currentDoc.name)}/variable-sets`);
-            if (response.ok) {
-              const data = await response.json();
-              const { variableSetIds, overrides } = data;
+            const data = await backend.getPromptVariableSets(currentDoc.name);
+            const { variableSetIds, overrides } = data;
 
-              // Merge variables from subscribed variable sets
-              for (const varSetId of variableSetIds) {
-                const varSet = variableSets.find((vs) => vs.id === varSetId);
-                if (varSet && varSet.variables) {
-                  // Add variables from this set
-                  for (const varName in varSet.variables) {
-                    mergedVariables[varName] = varSet.variables[varName];
-                  }
+            // Merge variables from subscribed variable sets
+            for (const varSetId of variableSetIds) {
+              const varSet = variableSets.find((vs) => vs.id === varSetId);
+              if (varSet && varSet.variables) {
+                // Add variables from this set
+                for (const varName in varSet.variables) {
+                  mergedVariables[varName] = varSet.variables[varName];
                 }
               }
+            }
 
-              // Apply overrides (overrides take precedence)
-              for (const varSetId in overrides) {
-                for (const varName in overrides[varSetId]) {
-                  mergedVariables[varName] = overrides[varSetId][varName];
-                }
+            // Apply overrides (overrides take precedence)
+            for (const varSetId in overrides) {
+              for (const varName in overrides[varSetId]) {
+                mergedVariables[varName] = overrides[varSetId][varName];
               }
             }
           } catch (e) {
@@ -157,15 +155,12 @@ const RenderModal: React.FC<RenderModalProps> = ({
             return prompt.content;
           }
 
-          // Otherwise fetch from API
+          // Otherwise fetch from backend
           try {
-            const response = await fetch(`/api/prompts/${encodeURIComponent(name)}`);
-            if (response.ok) {
-              const data = await response.json();
-              return data.content || '';
-            }
+            const data = await backend.getPrompt(name);
+            return data.content || '';
           } catch (e) {
-            console.warn(`Failed to fetch prompt content from API: ${name}`, e);
+            console.warn(`Failed to fetch prompt content: ${name}`, e);
           }
 
           return '';
