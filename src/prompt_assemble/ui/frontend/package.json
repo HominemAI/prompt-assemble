@@ -32,6 +32,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:local": "tsc && vite build",
+    "build:full": "tsc && vite build",
     "preview": "vite preview"
   }
 }

@@ -125,6 +125,9 @@ const App: React.FC = () => {
     createBackend({ mode: backendMode })
   );
 
+  // Check if backend mode is locked at build time
+  const lockedBackendMode = (typeof window !== 'undefined' ? (window as any).REACT_APP_LOCKED_BACKEND_MODE : undefined) as BackendMode | undefined;
+
   const [showSettings, setShowSettings] = useState(false);
   const [isBackendSwitching, setIsBackendSwitching] = useState(false);
 
@@ -274,6 +277,16 @@ const App: React.FC = () => {
    * Handle backend mode switching with data migration support.
    */
   const handleBackendChange = async (newMode: BackendMode, importData: boolean = false) => {
+    // Don't allow switching if backend is locked
+    if (lockedBackendMode) {
+      setAlertModal({
+        isOpen: true,
+        title: 'Backend Locked',
+        message: 'Backend switching is disabled for this deployment.',
+      });
+      return;
+    }
+
     setIsBackendSwitching(true);
     try {
       const oldBackend = backend;
@@ -1220,6 +1233,7 @@ You are a helpful assistant specializing in [[DOMAIN]].
         currentBackendMode={backendMode}
         onBackendChange={handleBackendChange}
         isLoading={isBackendSwitching}
+        lockedBackendMode={lockedBackendMode}
       />
     </div>
   );

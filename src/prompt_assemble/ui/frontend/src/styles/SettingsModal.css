@@ -78,6 +78,25 @@
   font-size: 14px;
 }
 
+.locked-notice {
+  background: var(--color-info-bg, #e3f2fd);
+  border: 1px solid var(--color-info, #2196f3);
+  border-radius: 6px;
+  padding: 12px;
+  margin: 12px 0;
+}
+
+.locked-notice p {
+  margin: 6px 0;
+  font-size: 14px;
+  color: var(--color-text-primary, #000000);
+}
+
+.locked-notice p:first-child {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
 .backend-options {
   display: flex;
   flex-direction: column;
@@ -106,6 +125,12 @@
 .backend-option.active {
   border-color: var(--color-primary, #0066cc);
   background: var(--color-primary-bg, #e6f2ff);
+}
+
+.backend-option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .option-icon {

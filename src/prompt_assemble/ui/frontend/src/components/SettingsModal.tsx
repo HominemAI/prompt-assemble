@@ -18,6 +18,7 @@ interface SettingsModalProps {
     importData?: boolean
   ) => Promise<void>;
   isLoading?: boolean;
+  lockedBackendMode?: BackendMode; // If set, backend switching is disabled
 }
 
 type SettingsStep = 'main' | 'switch-warning' | 'folder-select' | 'verifying';
@@ -28,6 +29,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   currentBackendMode,
   onBackendChange,
   isLoading = false,
+  lockedBackendMode,
 }) => {
   const [step, setStep] = useState<SettingsStep>('main');
   const [targetMode, setTargetMode] = useState<BackendMode>(currentBackendMode);
@@ -89,17 +91,32 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="settings-body">
             <div className="settings-section">
               <h3>Storage Backend</h3>
-              <p className="settings-description">
-                Choose where your prompts are stored.
-              </p>
+              {lockedBackendMode ? (
+                <div className="locked-notice">
+                  <p>
+                    <strong>📌 Backend Locked</strong>
+                  </p>
+                  <p>
+                    This deployment is configured to use{' '}
+                    <strong>
+                      {lockedBackendMode === 'local' ? 'Browser Storage (IndexedDB)' : 'Filesystem Storage'}
+                    </strong>{' '}
+                    only. Backend switching is disabled.
+                  </p>
+                </div>
+              ) : (
+                <p className="settings-description">
+                  Choose where your prompts are stored.
+                </p>
+              )}
 
               <div className="backend-options">
                 {/* Browser Only Option */}
                 <div
                   className={`backend-option ${
                     currentBackendMode === 'local' ? 'active' : ''
-                  }`}
-                  onClick={() => handleBackendToggle('local')}
+                  } ${lockedBackendMode ? 'disabled' : ''}`}
+                  onClick={() => !lockedBackendMode && handleBackendToggle('local')}
                 >
                   <div className="option-icon">🌐</div>
                   <div className="option-content">
@@ -124,8 +141,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div
                   className={`backend-option ${
                     currentBackendMode === 'filesystem' ? 'active' : ''
-                  }`}
-                  onClick={() => handleBackendToggle('filesystem')}
+                  } ${lockedBackendMode ? 'disabled' : ''}`}
+                  onClick={() => !lockedBackendMode && handleBackendToggle('filesystem')}
                 >
                   <div className="option-icon">📁</div>
                   <div className="option-content">

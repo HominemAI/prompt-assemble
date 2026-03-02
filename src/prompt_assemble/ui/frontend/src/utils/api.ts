@@ -1131,9 +1131,40 @@ export function createBackend(config: BackendConfig): PromptBackend {
   }
 }
 
-// Initialize from window.__PA_CONFIG__ or use remote as default
-const runtimeConfig: BackendConfig = (window as any).__PA_CONFIG__ ?? {
-  mode: 'remote' as BackendMode,
+/**
+ * Determine backend mode from multiple sources (in priority order):
+ * 1. window.__PA_CONFIG__ (Flask server injection)
+ * 2. localStorage (user preference)
+ * 3. REACT_APP_LOCKED_BACKEND_MODE build-time env var
+ * 4. REACT_APP_DEFAULT_BACKEND_MODE build-time env var
+ * 5. Default: 'remote'
+ */
+function getInitialBackendMode(): BackendMode {
+  // 1. Check window config (Flask injection)
+  if ((window as any).__PA_CONFIG__?.mode) {
+    return (window as any).__PA_CONFIG__.mode;
+  }
+
+  // 2. Check localStorage (user preference)
+  if (typeof window !== 'undefined') {
+    const stored = window.localStorage.getItem('prompt-assemble-backend') as BackendMode | null;
+    if (stored) return stored;
+  }
+
+  // 3. Check build-time locked mode (production override)
+  const lockedMode = (window as any).REACT_APP_LOCKED_BACKEND_MODE as BackendMode | undefined;
+  if (lockedMode) return lockedMode;
+
+  // 4. Check build-time default mode
+  const defaultMode = (window as any).REACT_APP_DEFAULT_BACKEND_MODE as BackendMode | undefined;
+  if (defaultMode) return defaultMode;
+
+  // 5. Final fallback
+  return 'remote' as BackendMode;
+}
+
+const runtimeConfig: BackendConfig = {
+  mode: getInitialBackendMode(),
 };
 
 export const backend: PromptBackend = createBackend(runtimeConfig);
