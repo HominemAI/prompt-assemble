@@ -138,21 +138,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           console.log(`  Found ${dbs.length} databases`);
           for (const db of dbs) {
             if (db.name && !dbNames.includes(db.name)) {
-              console.log(`  Deleting: ${db.name}`);
+              const dbName = db.name; // Type guard: db.name is definitely a string here
+              console.log(`  Deleting: ${dbName}`);
               await new Promise<void>((resolve) => {
                 let resolved = false;
                 const timeout = setTimeout(() => {
                   if (!resolved) {
-                    console.log(`  ⏱ Timeout for ${db.name}, moving on`);
+                    console.log(`  ⏱ Timeout for ${dbName}, moving on`);
                     resolved = true;
                     resolve();
                   }
                 }, 1000);
 
-                const deleteRequest = indexedDB.deleteDatabase(db.name);
+                const deleteRequest = indexedDB.deleteDatabase(dbName);
                 deleteRequest.onsuccess = () => {
                   if (!resolved) {
-                    console.log(`  ✓ Deleted ${db.name}`);
+                    console.log(`  ✓ Deleted ${dbName}`);
                     resolved = true;
                     clearTimeout(timeout);
                     resolve();
@@ -160,7 +161,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 };
                 deleteRequest.onerror = () => {
                   if (!resolved) {
-                    console.log(`  ✗ Error deleting ${db.name}`);
+                    console.log(`  ✗ Error deleting ${dbName}`);
                     resolved = true;
                     clearTimeout(timeout);
                     resolve();
