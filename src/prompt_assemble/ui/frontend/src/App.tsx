@@ -133,6 +133,7 @@ const App: React.FC = () => {
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSavesRef = useRef<Set<string>>(new Set());
   const isSavingRef = useRef<boolean>(false);
+  const isDeletingRef = useRef<boolean>(false);
 
   // Persist ONLY saved documents to localStorage (must have savedAt timestamp)
   // This ensures closed tabs don't reopen - they must be saved to persist
@@ -542,6 +543,7 @@ You are a helpful assistant specializing in [[DOMAIN]].
                 if (activeDocId === id) {
                   setActiveDocId(documents[0]?.id || null);
                 }
+                setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: () => {} });
                 return;
               }
 
@@ -556,6 +558,8 @@ You are a helpful assistant specializing in [[DOMAIN]].
                   setActiveDocId(documents[0]?.id || null);
                 }
                 setPrompts(prompts.filter((p) => p.name !== doc.name));
+
+                setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
                 setAlertModal({
                   isOpen: true,
@@ -572,6 +576,9 @@ You are a helpful assistant specializing in [[DOMAIN]].
 
               // Remove from prompts list silently (no visible refresh)
               setPrompts(prompts.filter((p) => p.name !== doc.name));
+
+              // Close the confirmation modal
+              setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: () => {} });
             } catch (error) {
               console.error('Error deleting document:', error);
               setAlertModal({
@@ -579,6 +586,9 @@ You are a helpful assistant specializing in [[DOMAIN]].
                 title: 'Delete Error',
                 message: 'Error deleting document. Check console for details.',
               });
+
+              // Close the confirmation modal even on error
+              setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: () => {} });
             }
           },
         });
@@ -1151,10 +1161,7 @@ You are a helpful assistant specializing in [[DOMAIN]].
         isOpen={confirmModal.isOpen}
         title={confirmModal.title}
         message={confirmModal.message}
-        onConfirm={() => {
-          confirmModal.onConfirm();
-          setConfirmModal({ ...confirmModal, isOpen: false });
-        }}
+        onConfirm={() => confirmModal.onConfirm()}
         onCancel={() => setConfirmModal({ ...confirmModal, isOpen: false })}
         confirmText={confirmModal.confirmText}
         cancelText={confirmModal.cancelText}
