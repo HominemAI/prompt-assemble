@@ -15,6 +15,7 @@ import {
   FiClock,
   FiPlay,
   FiSettings,
+  FiMessageSquare,
 } from 'react-icons/fi';
 import { useTheme } from './hooks/useTheme';
 import { createBackend, BackendMode, PromptBackend } from './utils/api';
@@ -32,6 +33,8 @@ import VariableSetsModal from './components/VariableSetsModal';
 import VariableSetsSelector from './components/VariableSetsSelector';
 import RenderModal from './components/RenderModal';
 import SettingsModal from './components/SettingsModal';
+import { lazy, Suspense } from 'react';
+const FeedbackModal = lazy(() => import('./components/FeedbackModal'));
 import './App.css';
 
 const lightLogo = '/logos/light_black.svg';
@@ -130,6 +133,7 @@ const App: React.FC = () => {
   const lockedBackendMode = (typeof window !== 'undefined' ? (window as any).REACT_APP_LOCKED_BACKEND_MODE : undefined) as BackendMode | undefined;
 
   const [showSettings, setShowSettings] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const [isBackendSwitching, setIsBackendSwitching] = useState(false);
 
   // Modal state
@@ -904,6 +908,13 @@ You are a helpful assistant specializing in [[DOMAIN]].
         </button>
         <button
           className="btn-icon"
+          onClick={() => setShowFeedback(true)}
+          title="Send Feedback"
+        >
+          <FiMessageSquare size={20} />
+        </button>
+        <button
+          className="btn-icon"
           onClick={() => setShowSettings(true)}
           title="Storage Settings"
         >
@@ -1221,7 +1232,10 @@ You are a helpful assistant specializing in [[DOMAIN]].
         isOpen={confirmModal.isOpen}
         title={confirmModal.title}
         message={confirmModal.message}
-        onConfirm={() => confirmModal.onConfirm()}
+        onConfirm={() => {
+          confirmModal.onConfirm();
+          setConfirmModal({ ...confirmModal, isOpen: false });
+        }}
         onCancel={() => setConfirmModal({ ...confirmModal, isOpen: false })}
         confirmText={confirmModal.confirmText}
         cancelText={confirmModal.cancelText}
@@ -1237,6 +1251,14 @@ You are a helpful assistant specializing in [[DOMAIN]].
         isLoading={isBackendSwitching}
         lockedBackendMode={lockedBackendMode}
       />
+
+      {/* Feedback Modal */}
+      <Suspense fallback={null}>
+        <FeedbackModal
+          isOpen={showFeedback}
+          onClose={() => setShowFeedback(false)}
+        />
+      </Suspense>
     </div>
     </BackendProvider>
   );

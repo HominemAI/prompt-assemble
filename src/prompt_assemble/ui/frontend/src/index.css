@@ -45,6 +45,10 @@
   .btn-secondary {
     @apply bg-gray-600 text-white border-gray-600 hover:bg-gray-700;
   }
+
+  .btn-default {
+    @apply bg-slate-600 dark:bg-slate-700 text-white border-slate-600 dark:border-slate-700 hover:bg-slate-700 dark:hover:bg-slate-800;
+  }
 }
 
 #root {
