@@ -139,6 +139,7 @@ node_modules/
 dist/
 .next/
 out/
+src/prompt_assemble/ui/static/assets/
 
 # IDE
 .vscode/
