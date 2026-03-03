@@ -106,6 +106,7 @@ export interface PromptBackend {
   revertPrompt(promptName: string, version: number): Promise<void>;
   exportPrompts(options: ExportOptions): Promise<Blob>;
   importFiles(files: File[], tags: string[]): Promise<ImportResult[]>;
+  backupAllData(): Promise<Blob>;
 }
 
 // ============================================================================
@@ -307,6 +308,11 @@ class RemoteBackend implements PromptBackend {
       }
     }
     return results;
+  }
+
+  async backupAllData(): Promise<Blob> {
+    // Call backend API to get all data as zip
+    return this.fetchBlob('/api/backup', { method: 'GET' });
   }
 }
 
@@ -592,6 +598,37 @@ class LocalBackend implements PromptBackend {
       }
     }
     return results;
+  }
+
+  async backupAllData(): Promise<Blob> {
+    const { default: JSZip } = await import('jszip');
+    const db = await this.dbPromise;
+    const zip = new JSZip();
+
+    // Get all data
+    const prompts = await db.getAll('prompts');
+    const varSets = await db.getAll('variable_sets');
+
+    // Create registry (tags, description, owner for each prompt)
+    const registry: Record<string, { tags: string[]; description: string; owner?: string }> = {};
+    for (const prompt of prompts) {
+      registry[prompt.name] = {
+        tags: prompt.tags,
+        description: prompt.description,
+        owner: prompt.owner,
+      };
+    }
+    zip.file('_registry.json', JSON.stringify(registry, null, 2));
+
+    // Save prompts as .prompt files (just content)
+    for (const prompt of prompts) {
+      zip.file(`${prompt.name}.prompt`, prompt.content);
+    }
+
+    // Save variable sets
+    zip.file('variable_sets.json', JSON.stringify(varSets, null, 2));
+
+    return zip.generateAsync({ type: 'blob' });
   }
 }
 
@@ -1163,6 +1200,46 @@ Continue?`;
       }
     }
     return results;
+  }
+
+  async backupAllData(): Promise<Blob> {
+    const { default: JSZip } = await import('jszip');
+    const zip = new JSZip();
+
+    // Get all prompts and metadata
+    const prompts = await this.listPrompts();
+    const varSets = await this.listVariableSets();
+
+    // Create registry
+    const registry: Record<string, { tags: string[]; description: string; owner?: string }> = {};
+    for (const promptInfo of prompts) {
+      try {
+        const prompt = await this.getPrompt(promptInfo.name);
+        registry[promptInfo.name] = {
+          tags: prompt.tags,
+          description: prompt.description,
+          owner: prompt.owner,
+        };
+      } catch (e) {
+        console.error(`Failed to get metadata for ${promptInfo.name}:`, e);
+      }
+    }
+    zip.file('_registry.json', JSON.stringify(registry, null, 2));
+
+    // Save prompts as .prompt files (just content)
+    for (const promptInfo of prompts) {
+      try {
+        const prompt = await this.getPrompt(promptInfo.name);
+        zip.file(`${promptInfo.name}.prompt`, prompt.content);
+      } catch (e) {
+        console.error(`Failed to export prompt ${promptInfo.name}:`, e);
+      }
+    }
+
+    // Save variable sets
+    zip.file('variable_sets.json', JSON.stringify(varSets, null, 2));
+
+    return zip.generateAsync({ type: 'blob' });
   }
 }
 

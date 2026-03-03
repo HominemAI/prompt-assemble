@@ -4,8 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import { FiX, FiCheckCircle, FiAlertCircle, FiTrash2 } from 'react-icons/fi';
-import { BackendMode } from '../utils/api';
+import { FiX, FiCheckCircle, FiAlertCircle, FiTrash2, FiDownload } from 'react-icons/fi';
+import { BackendMode, backend } from '../utils/api';
 import ConfirmModal from './ConfirmModal';
 import '../styles/SettingsModal.css';
 
@@ -38,6 +38,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [progress, setProgress] = useState<string>('');
   const [deleteConfirmText, setDeleteConfirmText] = useState<string>('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isBackingUp, setIsBackingUp] = useState(false);
 
   const handleBackendToggle = (newMode: BackendMode) => {
     if (newMode === currentBackendMode) return;
@@ -76,6 +77,31 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     setError('');
     setProgress('');
     setDeleteConfirmText('');
+  };
+
+  const handleBackupAllData = async () => {
+    setIsBackingUp(true);
+    try {
+      setProgress('Creating backup...');
+      const blob = await backend.backupAllData();
+
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `prompt-assemble-backup-${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setProgress('');
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create backup');
+    } finally {
+      setIsBackingUp(false);
+    }
   };
 
   const handleDeleteAllData = async () => {
@@ -289,6 +315,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     <FiCheckCircle className="active-indicator" />
                   )}
                 </div>
+              </div>
+
+              <div className="settings-section">
+                <h3>📦 Backup</h3>
+                <p className="settings-description">
+                  Download a ZIP file containing all your prompts, variable sets, and metadata.
+                </p>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleBackupAllData}
+                  disabled={isBackingUp}
+                >
+                  <FiDownload size={18} />
+                  {isBackingUp ? 'Creating Backup...' : 'Download Backup'}
+                </button>
               </div>
 
               <div className="danger-zone">
