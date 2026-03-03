@@ -36,6 +36,9 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:remote": "VITE_DEFAULT_BACKEND_MODE=remote vite",
+    "dev:local": "VITE_DEFAULT_BACKEND_MODE=local vite",
+    "dev:filesystem": "VITE_DEFAULT_BACKEND_MODE=filesystem vite",
     "build": "tsc && vite build",
     "build:local": "tsc && vite build",
     "build:full": "tsc && vite build",

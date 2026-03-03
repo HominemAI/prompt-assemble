@@ -13,6 +13,17 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 
 // ============================================================================
+// FILE SYSTEM API TYPE EXTENSIONS
+// ============================================================================
+
+declare global {
+  interface FileSystemDirectoryHandle {
+    queryPermission(options: { mode: 'read' | 'readwrite' }): Promise<'granted' | 'denied' | 'prompt'>;
+    requestPermission(options: { mode: 'read' | 'readwrite' }): Promise<'granted' | 'denied' | 'prompt'>;
+  }
+}
+
+// ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
 
@@ -348,6 +359,10 @@ interface PromptIDB extends DBSchema {
     key: string;
     value: IDBPromptVarSetDoc;
   };
+  'fs-metadata': {
+    key: string;
+    value: FileSystemDirectoryHandle;
+  };
 }
 
 class LocalBackend implements PromptBackend {
@@ -358,7 +373,7 @@ class LocalBackend implements PromptBackend {
   }
 
   private async initDB(): Promise<IDBPDatabase<PromptIDB>> {
-    return openDB<PromptIDB>('prompt-assemble', 1, {
+    return openDB<PromptIDB>('prompt-assemble', 3, {
       upgrade(db) {
         // Prompts store
         if (!db.objectStoreNames.contains('prompts')) {
@@ -386,6 +401,11 @@ class LocalBackend implements PromptBackend {
         // Prompt variable sets store
         if (!db.objectStoreNames.contains('prompt_variable_sets')) {
           db.createObjectStore('prompt_variable_sets', { keyPath: 'prompt_name' });
+        }
+
+        // Filesystem metadata store (for FileSystemBackend)
+        if (!db.objectStoreNames.contains('fs-metadata')) {
+          db.createObjectStore('fs-metadata');
         }
       },
     });
@@ -607,22 +627,53 @@ class FileSystemBackend implements PromptBackend {
   private ownerIndex: Map<string, Set<string>> = new Map();
   private promptNames: Set<string> = new Set();
 
+  private async initDB(): Promise<IDBPDatabase<PromptIDB>> {
+    return openDB<PromptIDB>('prompt-assemble', 3, {
+      upgrade(db) {
+        // Ensure all required stores exist (same as LocalBackend)
+        if (!db.objectStoreNames.contains('prompts')) {
+          const promptStore = db.createObjectStore('prompts', { keyPath: 'name' });
+          promptStore.createIndex('by-updated_at', 'updated_at');
+          promptStore.createIndex('by-tags', 'tags', { multiEntry: true });
+        }
+        if (!db.objectStoreNames.contains('prompt_versions')) {
+          const versionStore = db.createObjectStore('prompt_versions', {
+            keyPath: ['name', 'version'],
+          });
+          versionStore.createIndex('by-name', 'name');
+        }
+        if (!db.objectStoreNames.contains('variable_sets')) {
+          const varSetStore = db.createObjectStore('variable_sets', {
+            keyPath: 'id',
+          });
+          varSetStore.createIndex('by-name', 'name');
+        }
+        if (!db.objectStoreNames.contains('prompt_variable_sets')) {
+          db.createObjectStore('prompt_variable_sets', { keyPath: 'prompt_name' });
+        }
+        if (!db.objectStoreNames.contains('fs-metadata')) {
+          db.createObjectStore('fs-metadata');
+        }
+      },
+    });
+  }
+
   async initialize(): Promise<void> {
     // Try to restore handle from IDB
-    const db = await openDB('prompt-assemble', 1);
-    const storedHandle = await (db as any).get('fs-metadata', 'root-dir');
+    const db = await this.initDB();
+    const storedHandle = await db.get('fs-metadata', 'root-dir');
 
     if (storedHandle) {
       try {
         const perm = await storedHandle.queryPermission({ mode: 'readwrite' });
         if (perm === 'granted') {
           this.rootHandle = storedHandle;
-          await this.scanDirectory();
+          await this.scanDirectory(storedHandle);
         } else if (perm === 'prompt') {
           const granted = await storedHandle.requestPermission({ mode: 'readwrite' });
           if (granted === 'granted') {
             this.rootHandle = storedHandle;
-            await this.scanDirectory();
+            await this.scanDirectory(storedHandle);
           }
         }
       } catch (e) {
@@ -660,8 +711,8 @@ class FileSystemBackend implements PromptBackend {
 
       // 4. Save handle to IDB and scan
       this.rootHandle = handle;
-      const db = await openDB('prompt-assemble', 1);
-      await (db as any).put('fs-metadata', handle, 'root-dir');
+      const db = await this.initDB();
+      await db.put('fs-metadata', handle, 'root-dir');
 
       // Scan the directory
       this.promptMeta.clear();
@@ -730,9 +781,9 @@ Continue?`;
   private async ensureHandle(): Promise<FileSystemDirectoryHandle> {
     if (!this.rootHandle) {
       this.rootHandle = await (window as any).showDirectoryPicker();
-      const db = await openDB('prompt-assemble', 1);
-      await (db as any).put('fs-metadata', this.rootHandle, 'root-dir');
-      await this.scanDirectory();
+      const db = await this.initDB();
+      await db.put('fs-metadata', this.rootHandle!, 'root-dir');
+      await this.scanDirectory(this.rootHandle!);
     }
     return this.rootHandle!;
   }
@@ -1136,8 +1187,9 @@ export function createBackend(config: BackendConfig): PromptBackend {
  * 1. window.__PA_CONFIG__ (Flask server injection)
  * 2. localStorage (user preference)
  * 3. REACT_APP_LOCKED_BACKEND_MODE build-time env var
- * 4. REACT_APP_DEFAULT_BACKEND_MODE build-time env var
- * 5. Default: 'remote'
+ * 4. VITE_DEFAULT_BACKEND_MODE (development env var)
+ * 5. REACT_APP_DEFAULT_BACKEND_MODE build-time env var
+ * 6. Default: 'remote'
  */
 function getInitialBackendMode(): BackendMode {
   // 1. Check window config (Flask injection)
@@ -1155,11 +1207,15 @@ function getInitialBackendMode(): BackendMode {
   const lockedMode = (window as any).REACT_APP_LOCKED_BACKEND_MODE as BackendMode | undefined;
   if (lockedMode) return lockedMode;
 
-  // 4. Check build-time default mode
+  // 4. Check Vite dev-time default mode
+  const viteMode = import.meta.env.VITE_DEFAULT_BACKEND_MODE as BackendMode | undefined;
+  if (viteMode) return viteMode;
+
+  // 5. Check build-time default mode
   const defaultMode = (window as any).REACT_APP_DEFAULT_BACKEND_MODE as BackendMode | undefined;
   if (defaultMode) return defaultMode;
 
-  // 5. Final fallback
+  // 6. Final fallback
   return 'remote' as BackendMode;
 }
 
