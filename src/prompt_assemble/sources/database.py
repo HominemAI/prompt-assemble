@@ -139,6 +139,9 @@ class DatabaseSource(PromptSource):
         """Ensure database schema exists."""
         with self._get_cursor() as cursor:
             try:
+                # Enable autocommit for schema operations to avoid transaction abort
+                cursor.connection.autocommit = True
+
                 # Always try to create all tables - CREATE TABLE IF NOT EXISTS is safe
                 logger.info("Creating/verifying prompts table...")
                 cursor.execute(
@@ -267,12 +270,13 @@ class DatabaseSource(PromptSource):
                     """
                 )
 
-                cursor.connection.commit()
                 logger.info("✓ Database schema successfully created/verified")
             except Exception as e:
-                cursor.connection.rollback()
                 logger.error(f"ERROR ensuring schema: {e}")
                 raise
+            finally:
+                # Disable autocommit after schema operations
+                cursor.connection.autocommit = False
 
     def refresh(self) -> None:
         """Refresh metadata from database (not content)."""
