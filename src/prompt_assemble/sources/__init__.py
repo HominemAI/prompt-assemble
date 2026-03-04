@@ -72,5 +72,9 @@ def create_database_source_from_env(table_prefix: str = None) -> DatabaseSource:
         f"Connected to PostgreSQL: {username}@{hostname}:{port}/{database}"
     )
 
+    # Use provided table_prefix or read from environment
+    if table_prefix is None:
+        table_prefix = os.getenv("PROMPT_ASSEMBLE_TABLE_PREFIX", "")
+
     # Create and return DatabaseSource
     return DatabaseSource(conn, table_prefix=table_prefix)
