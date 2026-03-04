@@ -199,12 +199,11 @@ class DatabaseSource(PromptSource):
                     cursor.execute(
                         f"ALTER TABLE {self._table('prompt_versions')} ADD COLUMN revision_comment TEXT"
                     )
-                    cursor.connection.commit()
                     logger.info(f"Added revision_comment column to {self._table('prompt_versions')}")
                 except Exception as e:
+                    # Silently ignore if column already exists
                     if "already exists" not in str(e).lower() and "duplicate column" not in str(e).lower():
                         logger.debug(f"Could not add revision_comment column: {e}")
-                    cursor.connection.rollback()
 
                 # Variable Sets tables - these might not exist in older databases
                 logger.info("Creating/verifying variable_sets table...")
