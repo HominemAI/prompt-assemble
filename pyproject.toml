@@ -5,23 +5,29 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "prompt-assemble"
 version = "0.1.0"
-description = "A lightweight prompt assembly library using sigil-based substitution"
+description = "A lightweight prompt assembly library using sigil-based substitution with no template logic"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
-    { name = "Your Name", email = "your.email@example.com" },
+    { name = "HominemAI", email = "contact@hominema.ai" },
 ]
-keywords = ["prompt", "llm", "template", "assembly", "pxml"]
+maintainers = [
+    { name = "HominemAI", email = "contact@hominema.ai" },
+]
+keywords = ["prompt", "llm", "template", "assembly", "substitution", "sigil", "ai"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Text Processing",
+    "Typing :: Typed",
 ]
 
 [project.optional-dependencies]
@@ -47,10 +53,11 @@ ui-full = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/prompt-assemble"
-Documentation = "https://github.com/yourusername/prompt-assemble/blob/main/README.md"
-Repository = "https://github.com/yourusername/prompt-assemble.git"
-Issues = "https://github.com/yourusername/prompt-assemble/issues"
+Homepage = "https://github.com/HominemAI/prompt-assemble"
+Documentation = "https://github.com/HominemAI/prompt-assemble/blob/main/README.md"
+Repository = "https://github.com/HominemAI/prompt-assemble.git"
+"Bug Tracker" = "https://github.com/HominemAI/prompt-assemble/issues"
+Changelog = "https://github.com/HominemAI/prompt-assemble/releases"
 
 [project.scripts]
 pambl = "prompt_assemble.cli:main"

@@ -1,0 +1,67 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel setuptools twine
+
+      - name: Verify package metadata
+        run: |
+          python -m build
+          twine check dist/*
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: false
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body: |
+            # Release ${{ github.ref_name }}
+
+            Package published to PyPI: https://pypi.org/project/prompt-assemble/${{ github.ref_name }}
+
+            **Install:**
+            ```bash
+            pip install prompt-assemble==${{ github.ref_name }}
+            ```
+
+            **With database support:**
+            ```bash
+            pip install "prompt-assemble[${{ github.ref_name }}][db]"
+            ```
+
+            **With API server:**
+            ```bash
+            pip install "prompt-assemble[${{ github.ref_name }}][ui]"
+            ```
+
+            See [Documentation](https://github.com/${{ github.repository }}/blob/main/README.md) for more details.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

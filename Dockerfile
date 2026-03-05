@@ -3,6 +3,9 @@ FROM node:20-alpine AS frontend-builder
 
 WORKDIR /frontend
 
+# Install git (needed to clone repository)
+RUN apk add --no-cache git
+
 # Clone the frontend repository
 ARG FRONTEND_REPO=https://github.com/HominemAI/prompt-assemble-ui.git
 ARG FRONTEND_BRANCH=main
