@@ -14,7 +14,7 @@ The UI uses Vite for fast builds and React for the interface.
 #### 1. Install Frontend Dependencies
 
 ```bash
-cd src/prompt_assemble/ui/frontend
+cd src/prompt_assemble/api/frontend
 npm install
 ```
 
@@ -24,13 +24,13 @@ npm install
 npm run build
 ```
 
-This compiles the React TypeScript code to static files in `src/prompt_assemble/ui/static/`.
+This compiles the React TypeScript code to static files in `src/prompt_assemble/api/static/`.
 
 #### 3. Run the Server
 
 ```bash
 cd /Users/asanchez/DevWorkspace/prompt-assemble
-python -m prompt_assemble.ui.server
+python -m prompt_assemble.api.server
 ```
 
 The app will be available at **http://localhost:5000**
@@ -41,26 +41,26 @@ The app will be available at **http://localhost:5000**
 
 **Terminal 1 - Frontend Dev Server**
 ```bash
-cd src/prompt_assemble/ui/frontend
+cd src/prompt_assemble/api/frontend
 npm run dev
 ```
 This starts Vite dev server at http://localhost:5173 with hot reload
 
 **Terminal 2 - Flask Backend**
 ```bash
-python -m prompt_assemble.ui.server
+python -m prompt_assemble.api.server
 ```
 
 #### Option 2: Build Once and Serve
 
 ```bash
 # Build frontend
-cd src/prompt_assemble/ui/frontend
+cd src/prompt_assemble/api/frontend
 npm run build
 
 # Run backend
 cd /Users/asanchez/DevWorkspace/prompt-assemble
-python -m prompt_assemble.ui.server
+python -m prompt_assemble.api.server
 ```
 
 ### Complete Setup Script
@@ -75,7 +75,7 @@ cd /Users/asanchez/DevWorkspace/prompt-assemble
 pip install -e .
 
 # Install frontend dependencies
-cd src/prompt_assemble/ui/frontend
+cd src/prompt_assemble/api/frontend
 npm install
 
 # Build frontend
@@ -84,7 +84,7 @@ npm run build
 # Run server
 cd /Users/asanchez/DevWorkspace/prompt-assemble
 export PROMPT_ASSEMBLE_UI=true
-python -m prompt_assemble.ui.server
+python -m prompt_assemble.api.server
 ```
 
 ### Environment Variables
@@ -109,14 +109,14 @@ export DB_DATABASE=prompts
 
 If you see blank page with 404 errors for static files:
 1. Make sure you ran `npm run build`
-2. Check that `src/prompt_assemble/ui/static/` directory exists
+2. Check that `src/prompt_assemble/api/static/` directory exists
 3. Verify `index.html` is in the static directory
 
 ### Port Already in Use
 
 ```bash
 # Change port
-python -m prompt_assemble.ui.server --port 8000
+python -m prompt_assemble.api.server --port 8000
 ```
 
 ### Module Import Errors

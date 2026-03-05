@@ -89,13 +89,13 @@ provider = PromptProvider(source)
 
 1. Start the server:
 ```bash
-cd src/prompt_assemble/ui/frontend
+cd src/prompt_assemble/api/frontend
 npm install && npm run build
 cd ..
 export PROMPT_ASSEMBLE_UI=true
 export PROMPT_ASSEMBLE_SOURCE=filesystem
 export FILESYSTEM_ROOT=../../examples/research_paper_system
-python -m prompt_assemble.ui.server
+python -m prompt_assemble.api.server
 ```
 
 2. Open http://localhost:8000 in browser

@@ -352,7 +352,7 @@ FROM ghcr.io/AgentSanchez/prompt-assemble:latest
 COPY ./prompts/ /app/prompts/
 
 # Custom entrypoint
-ENTRYPOINT ["python", "-m", "prompt_assemble.ui"]
+ENTRYPOINT ["python", "-m", "prompt_assemble.api"]
 ```
 
 Build and run:
@@ -444,6 +444,6 @@ The Dockerfile uses multi-stage builds to minimize image size:
 ## See Also
 
 - [README.md](./README.md) - Main documentation
-- [SETUP_GUIDE.md](./src/prompt_assemble/ui/SETUP_GUIDE.md) - UI setup
+- [SETUP_GUIDE.md](./src/prompt_assemble/api/SETUP_GUIDE.md) - UI setup
 - [Dockerfile](./Dockerfile) - Docker configuration
 - [docker-compose.yml](#docker-compose) - Example compose file

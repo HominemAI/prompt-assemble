@@ -1,4 +1,8 @@
-"""Tests for DatabaseSource table prefix functionality."""
+"""Tests for DatabaseSource table prefix functionality.
+
+NOTE: These tests require PostgreSQL. Use pytest -k "not test_database_prefix" to skip them.
+Run with: PGHOST=localhost PGUSER=postgres PGPASSWORD=... PGDATABASE=test_prompts pytest tests/test_database_prefix.py
+"""
 
 import sqlite3
 import os
@@ -6,6 +10,8 @@ import os
 import pytest
 
 from prompt_assemble.sources import DatabaseSource
+
+pytestmark = pytest.mark.skip(reason="Requires PostgreSQL (not supported with SQLite)")
 
 
 def test_table_prefix_from_env():

@@ -67,7 +67,7 @@ npm run build:full
 
 # 2. Start Flask server
 export PROMPT_ASSEMBLE_UI=true
-python -m prompt_assemble.ui.server
+python -m prompt_assemble.api.server
 
 # 3. Visit http://localhost:8000
 ```
@@ -148,7 +148,7 @@ git push origin main
 # 1. Build
 npm run build:full
 
-# 2. Flask server picks it up from src/prompt_assemble/ui/static/
+# 2. Flask server picks it up from src/prompt_assemble/api/static/
 docker build -t prompt-assemble .
 docker run -p 8000:8000 prompt-assemble
 
@@ -167,7 +167,7 @@ npm run build:full
 # API Server (Heroku, Railway, AWS, etc.)
 export PROMPT_ASSEMBLE_UI=false
 export FLASK_PORT=5000
-python -m prompt_assemble.ui.server
+python -m prompt_assemble.api.server
 
 # Users visit UI on Netlify
 # → App calls /api/... on your API server
@@ -242,7 +242,7 @@ npm run build
 2. If you need RemoteBackend, run Flask server:
    ```bash
    export PROMPT_ASSEMBLE_UI=true
-   python -m prompt_assemble.ui.server
+   python -m prompt_assemble.api.server
    ```
 
 ### Can't select FileSystemBackend

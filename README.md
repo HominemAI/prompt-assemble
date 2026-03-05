@@ -80,6 +80,8 @@ Body:
 |-------|---------|
 | `[[VAR_NAME]]` | Simple variable substitution |
 | `[[PROMPT: name]]` | Inject a named prompt component |
+| `[[PROMPT_TAG: tag1, tag2]]` | Inject all prompts matching tags (AND intersection) |
+| `[[PROMPT_TAG:N: tag1, tag2]]` | Inject N most recent prompts matching tags |
 
 ## Comments
 
@@ -113,13 +115,14 @@ pambl --template prompt.prompt --components components.json --variables vars.jso
 
 ## Database
 
-**The primary data backend is PostgreSQL.** The library uses a DBAPI2-compatible interface, supporting any standard SQL database.
+**PostgreSQL is required.** The DatabaseSource implementation uses PostgreSQL-specific features including automatic reconnection on timeout and transaction management optimized for reliability.
 
-### Supported Databases
+### PostgreSQL Support
 
-- **PostgreSQL** (recommended for production) — fully tested and optimized
-- **SQLite** (development/testing)
-- Any DBAPI2-compatible database (MySQL, MariaDB, etc.)
+- **PostgreSQL 10+** (required for production and testing)
+- Automatic connection reconnection on timeout
+- Multi-tenant support via table prefixes
+- Version history and tagging
 
 ### Quick Setup with PostgreSQL
 
@@ -270,7 +273,7 @@ You can also configure these settings directly in Python:
 
 ```python
 from prompt_assemble.sources import DatabaseSource
-from prompt_assemble.ui import run_server
+from prompt_assemble.api import run_server
 import psycopg2
 
 # Configure PostgreSQL database with table prefix
@@ -315,23 +318,48 @@ DB_DATABASE=prompts
 PROMPT_ASSEMBLE_TABLE_PREFIX=myapp_  # Table prefix for multi-tenancy
 ```
 
-### Database Drivers
+### Database Driver
 
-Install the database driver for your backend:
+Install psycopg2 for PostgreSQL:
 
 ```bash
-# PostgreSQL (recommended)
 pip install psycopg2-binary
-
-# SQLite (included with Python)
-# No installation needed
-
-# MySQL / MariaDB
-pip install mysql-connector-python
-
-# Other databases
-pip install <dbapi2-driver>
 ```
+
+## Connection Resilience
+
+The DatabaseSource automatically handles connection timeouts and network interruptions:
+
+- **Automatic reconnection** — Detects closed connections and reconnects transparently
+- **Health checks** — Validates connection before each operation
+- **Timeout recovery** — Handles PostgreSQL idle timeout gracefully
+
+No configuration required — reconnection happens automatically on these operations:
+- `save_prompt()` - Save/update prompts
+- `delete_prompt()` - Delete prompts
+- `refresh()` - Reload metadata
+- `get_raw()` - Fetch content
+- All variable set operations
+
+## Testing
+
+Run the full test suite:
+
+```bash
+pytest tests/
+```
+
+**Note:** Database-specific tests require PostgreSQL:
+
+```bash
+# Skip database tests (for environments without PostgreSQL)
+pytest tests/ -k "not test_database"
+
+# Run only with PostgreSQL available
+PGHOST=localhost PGUSER=postgres PGPASSWORD=secret PGDATABASE=test_prompts pytest tests/test_database_source.py
+```
+
+**Test Coverage:** 118 passing tests covering core library, FileSystem source, and listener system. PostgreSQL-specific tests are marked as requiring PostgreSQL.
 
 ## Contributing
 

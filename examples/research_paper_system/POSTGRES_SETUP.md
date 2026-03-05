@@ -166,7 +166,7 @@ output = provider.render("research_paper_generator", variables=variables)
 
 ```bash
 # Build the frontend
-cd src/prompt_assemble/ui/frontend
+cd src/prompt_assemble/api/frontend
 npm run build
 
 # Configure environment
@@ -179,7 +179,7 @@ export DB_DATABASE=prompts
 
 # Start server
 cd ../
-python -m prompt_assemble.ui.server
+python -m prompt_assemble.api.server
 
 # Open http://localhost:8000
 ```

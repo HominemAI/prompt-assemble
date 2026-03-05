@@ -1,4 +1,8 @@
-"""Tests for DatabaseSource."""
+"""Tests for DatabaseSource.
+
+NOTE: These tests require PostgreSQL. Use pytest -k "not test_database_source" to skip them.
+Run with: PGHOST=localhost PGUSER=postgres PGPASSWORD=... PGDATABASE=test_prompts pytest tests/test_database_source.py
+"""
 
 import sqlite3
 import uuid
@@ -7,6 +11,9 @@ import pytest
 
 from prompt_assemble.exceptions import PromptNotFoundError, SourceConnectionError
 from prompt_assemble.sources import DatabaseSource
+
+
+pytestmark = pytest.mark.skip(reason="Requires PostgreSQL (not supported with SQLite)")
 
 
 @pytest.fixture

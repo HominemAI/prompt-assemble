@@ -21,7 +21,7 @@ if __name__ == "__main__":
     try:
         import psycopg2
         from prompt_assemble.sources import DatabaseSource
-        from prompt_assemble.ui.server import run_server
+        from prompt_assemble.api.server import run_server
 
         logger.info("Starting Prompt Manager UI Server")
 
