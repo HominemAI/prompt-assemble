@@ -13,15 +13,13 @@ from prompt_assemble.exceptions import PromptNotFoundError, SourceConnectionErro
 from prompt_assemble.sources import DatabaseSource
 
 
-pytestmark = pytest.mark.skip(reason="Requires PostgreSQL (not supported with SQLite)")
-
-
 @pytest.fixture
 def db_connection():
-    """Create an in-memory SQLite database connection."""
-    conn = sqlite3.connect(":memory:")
-    yield conn
-    conn.close()
+    """Create an in-memory SQLite database connection.
+
+    SKIPPED: These tests require PostgreSQL. The DatabaseSource is PostgreSQL-only.
+    """
+    pytest.skip("DatabaseSource requires PostgreSQL (not supported with SQLite)")
 
 
 class TestDatabaseSourceBasics:
