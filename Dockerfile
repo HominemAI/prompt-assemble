@@ -30,7 +30,7 @@ COPY setup.py pyproject.toml README.md LICENSE /app/
 COPY src/ /app/src/
 
 # Copy built frontend assets to static directory
-COPY --from=frontend-builder /frontend/dist /app/src/prompt_assemble/api/static
+COPY --from=frontend-builder /frontend/static /app/src/prompt_assemble/api/static
 
 # Install prompt-assemble with database dependencies
 RUN pip install --no-cache-dir -e ".[db]"
