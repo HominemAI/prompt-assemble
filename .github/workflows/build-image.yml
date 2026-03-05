@@ -136,12 +136,18 @@ jobs:
             ## Quick Start
 
             ```bash
-            docker run -p 5000:5000 \\
-              -e PROMPT_ASSEMBLE_UI=true \\
-              -v prompts:/app/prompts \\
+            docker run -p 8000:8000 \\
+              -e DB_HOSTNAME=your-postgres-host \\
+              -e DB_PORT=5432 \\
+              -e DB_USERNAME=postgres \\
+              -e DB_PASSWORD=your-password \\
+              -e DB_DATABASE=prompts \\
+              -e DB_PREFIX=pambl_ \\
               ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
             ```
 
-            Open http://localhost:5000 in your browser.
+            Open http://localhost:8000 in your browser.
+
+            For complete documentation, see [README.md](https://github.com/${{ github.repository }}/blob/main/README.md)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
