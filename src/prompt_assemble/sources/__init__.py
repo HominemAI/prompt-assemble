@@ -59,13 +59,14 @@ def create_database_source_from_env(table_prefix: str = None) -> DatabaseSource:
             "DB_PASSWORD environment variable is required for PostgreSQL connection"
         )
 
-    # Create connection
+    # Create connection with timeout for queries
     conn = psycopg2.connect(
         host=hostname,
         port=port,
         user=username,
         password=password,
-        database=database
+        database=database,
+        options="-c statement_timeout=30000"  # 30 second timeout
     )
 
     logger.info(
@@ -74,7 +75,7 @@ def create_database_source_from_env(table_prefix: str = None) -> DatabaseSource:
 
     # Use provided table_prefix or read from environment
     if table_prefix is None:
-        table_prefix = os.getenv("PROMPT_ASSEMBLE_TABLE_PREFIX", "")
+        table_prefix = os.getenv("PROMPT_ASSEMBLE_TABLE_PREFIX", "pambl_")
 
     # Create and return DatabaseSource
     return DatabaseSource(conn, table_prefix=table_prefix)

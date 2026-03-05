@@ -11,7 +11,7 @@ from pathlib import Path
 os.environ["PROMPT_ASSEMBLE_UI"] = "true"
 
 from prompt_assemble.sources import FileSystemSource, DatabaseSource
-from prompt_assemble.ui import run_server
+from prompt_assemble.api import run_server
 import sqlite3
 
 

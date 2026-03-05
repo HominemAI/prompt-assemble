@@ -277,7 +277,7 @@ source = DatabaseSource(conn)  # Uses production_ prefix from env
 ```python
 import os
 from prompt_assemble.sources import DatabaseSource
-from prompt_assemble.ui import run_server
+from prompt_assemble.api import run_server
 import sqlite3
 
 # Set up multi-tenant database

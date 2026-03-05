@@ -1,5 +1,5 @@
 """
-Flask/FastAPI server for the prompt management UI.
+Flask REST API server for Prompt Assemble.
 
 Provides REST API endpoints for:
 - Listing prompts
@@ -7,6 +7,7 @@ Provides REST API endpoints for:
 - Tag management
 - Revision history
 - Export functionality
+- Variable sets management
 """
 
 import json
@@ -16,11 +17,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+# Configure logging to show INFO and above messages
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
 logger = logging.getLogger(__name__)
 
-# Path to frontend static files (built by Vite)
+# Path to static files (if needed for deployment)
 STATIC_DIR = Path(__file__).parent / "static"
-FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
 def create_app(source=None, config=None):
@@ -852,7 +858,7 @@ def run_server(
     source=None, host: str = "127.0.0.1", port: int = None, debug: bool = False
 ):
     """
-    Run the UI server.
+    Run the REST API server.
 
     Args:
         source: PromptSource instance (if None, auto-creates from env vars)
@@ -861,17 +867,10 @@ def run_server(
         debug: Enable debug mode
 
     Environment Variables:
-        PROMPT_ASSEMBLE_UI: Must be 'true' to enable UI
         PORT: Server port (default: 8000)
         DB_HOSTNAME: PostgreSQL hostname (for auto-created DatabaseSource)
         DB_PASSWORD: PostgreSQL password (required if DB_HOSTNAME set)
     """
-    if not os.getenv("PROMPT_ASSEMBLE_UI", "").lower() == "true":
-        logger.warning(
-            "Set PROMPT_ASSEMBLE_UI=true environment variable to enable UI"
-        )
-        return
-
     # If no source provided, try to auto-create from environment
     if source is None and os.getenv("DB_HOSTNAME"):
         try:
@@ -892,7 +891,7 @@ def run_server(
 
     app = create_app(source=source)
     if app:
-        logger.info(f"Starting Prompt Manager UI at http://{host}:{port}")
+        logger.info(f"Starting Prompt Manager API at http://{host}:{port}")
         app.run(host=host, port=port, debug=debug)
 
 

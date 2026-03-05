@@ -135,148 +135,233 @@ class DatabaseSource(PromptSource):
         """Get the full table name with prefix."""
         return f"{self.table_prefix}{name}"
 
+    def _table_exists(self, cursor, table_name: str) -> bool:
+        """Check if a table exists in the database (PostgreSQL only)."""
+        cursor.execute(
+            "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name=%s)",
+            (table_name,)
+        )
+        return cursor.fetchone()[0]
+
     def _ensure_schema(self) -> None:
         """Ensure database schema exists."""
         with self._get_cursor() as cursor:
             try:
-                # Enable autocommit for schema operations to avoid transaction abort
-                cursor.connection.autocommit = True
-
-                # Always try to create all tables - CREATE TABLE IF NOT EXISTS is safe
-                logger.info("Creating/verifying prompts table...")
-                cursor.execute(
-                    f"""
-                    CREATE TABLE IF NOT EXISTS {self._table('prompts')} (
-                        id TEXT PRIMARY KEY,
-                        name TEXT UNIQUE NOT NULL,
-                        content TEXT NOT NULL,
-                        version INTEGER NOT NULL DEFAULT 1,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                    """
-                )
-
-                cursor.execute(
-                    f"""
-                    CREATE TABLE IF NOT EXISTS {self._table('prompt_registry')} (
-                        id TEXT PRIMARY KEY,
-                        prompt_id TEXT NOT NULL UNIQUE,
-                        description TEXT,
-                        owner TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id)
-                    )
-                    """
-                )
-
-                cursor.execute(
-                    f"""
-                    CREATE TABLE IF NOT EXISTS {self._table('prompt_tags')} (
-                        prompt_id TEXT NOT NULL,
-                        tag TEXT NOT NULL,
-                        PRIMARY KEY (prompt_id, tag),
-                        FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id)
-                    )
-                    """
-                )
-
-                cursor.execute(
-                    f"""
-                    CREATE TABLE IF NOT EXISTS {self._table('prompt_versions')} (
-                        id TEXT PRIMARY KEY,
-                        prompt_id TEXT NOT NULL,
-                        version INTEGER NOT NULL,
-                        content TEXT NOT NULL,
-                        revision_comment TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        UNIQUE(prompt_id, version),
-                        FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id)
-                    )
-                    """
-                )
-
-                # Add revision_comment column if it doesn't exist (for backwards compatibility)
+                # Enable autocommit for schema operations to avoid transaction abort (PostgreSQL only)
                 try:
+                    cursor.connection.autocommit = True
+                except (AttributeError, TypeError):
+                    # SQLite and other databases don't support autocommit
+                    pass
+
+                # Check and create tables only if they don't exist
+                table_name = self._table('prompts')
+                if not self._table_exists(cursor, table_name):
+                    logger.info(f"Creating table: {table_name}")
                     cursor.execute(
-                        f"ALTER TABLE {self._table('prompt_versions')} ADD COLUMN revision_comment TEXT"
+                        f"""
+                        CREATE TABLE {table_name} (
+                            id TEXT PRIMARY KEY,
+                            name TEXT UNIQUE NOT NULL,
+                            content TEXT NOT NULL,
+                            version INTEGER NOT NULL DEFAULT 1,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
                     )
-                    logger.info(f"Added revision_comment column to {self._table('prompt_versions')}")
-                except Exception as e:
-                    # Silently ignore if column already exists
-                    if "already exists" not in str(e).lower() and "duplicate column" not in str(e).lower():
-                        logger.debug(f"Could not add revision_comment column: {e}")
+                    logger.info(f"✓ Table {table_name} created")
+                else:
+                    logger.info(f"✓ Table {table_name} already exists")
+
+                table_name = self._table('prompt_registry')
+                if not self._table_exists(cursor, table_name):
+                    logger.info(f"Creating table: {table_name}")
+                    cursor.execute(
+                        f"""
+                        CREATE TABLE {table_name} (
+                            id TEXT PRIMARY KEY,
+                            prompt_id TEXT NOT NULL UNIQUE,
+                            description TEXT,
+                            owner TEXT,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id)
+                        )
+                        """
+                    )
+                    logger.info(f"✓ Table {table_name} created")
+                else:
+                    logger.info(f"✓ Table {table_name} already exists")
+
+                table_name = self._table('prompt_tags')
+                if not self._table_exists(cursor, table_name):
+                    logger.info(f"Creating table: {table_name}")
+                    cursor.execute(
+                        f"""
+                        CREATE TABLE {table_name} (
+                            prompt_id TEXT NOT NULL,
+                            tag TEXT NOT NULL,
+                            PRIMARY KEY (prompt_id, tag),
+                            FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id)
+                        )
+                        """
+                    )
+                    logger.info(f"✓ Table {table_name} created")
+                else:
+                    logger.info(f"✓ Table {table_name} already exists")
+
+                table_name = self._table('prompt_versions')
+                if not self._table_exists(cursor, table_name):
+                    logger.info(f"Creating table: {table_name}")
+                    cursor.execute(
+                        f"""
+                        CREATE TABLE {table_name} (
+                            id TEXT PRIMARY KEY,
+                            prompt_id TEXT NOT NULL,
+                            version INTEGER NOT NULL,
+                            content TEXT NOT NULL,
+                            revision_comment TEXT,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            UNIQUE(prompt_id, version),
+                            FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id)
+                        )
+                        """
+                    )
+                    logger.info(f"✓ Table {table_name} created")
+                else:
+                    logger.info(f"✓ Table {table_name} already exists")
+                    # Add revision_comment column if it doesn't exist (for backwards compatibility)
+                    try:
+                        cursor.execute(
+                            f"ALTER TABLE {table_name} ADD COLUMN revision_comment TEXT"
+                        )
+                        logger.info(f"Added revision_comment column to {table_name}")
+                    except Exception as e:
+                        # Silently ignore if column already exists
+                        if "already exists" not in str(e).lower() and "duplicate column" not in str(e).lower():
+                            logger.debug(f"Could not add revision_comment column: {e}")
 
                 # Variable Sets tables - these might not exist in older databases
-                logger.info("Creating/verifying variable_sets table...")
-                cursor.execute(
-                    f"""
-                    CREATE TABLE IF NOT EXISTS {self._table('variable_sets')} (
-                        id TEXT PRIMARY KEY,
-                        name TEXT UNIQUE NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                    """
-                )
-                logger.info("variable_sets table created/verified")
+                table_name = self._table('variable_sets')
+                if not self._table_exists(cursor, table_name):
+                    logger.info(f"Creating table: {table_name}")
+                    try:
+                        cursor.execute(
+                            f"""
+                            CREATE TABLE {table_name} (
+                                id TEXT PRIMARY KEY,
+                                name TEXT UNIQUE NOT NULL,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                            """
+                        )
+                        logger.info(f"✓ Table {table_name} created")
+                    except Exception as e:
+                        logger.warning(f"Could not create variable_sets table: {e}")
+                else:
+                    logger.info(f"✓ Table {table_name} already exists")
 
-                cursor.execute(
-                    f"""
-                    CREATE TABLE IF NOT EXISTS {self._table('variable_set_variables')} (
-                        id TEXT PRIMARY KEY,
-                        variable_set_id TEXT NOT NULL,
-                        key TEXT NOT NULL,
-                        value TEXT NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        UNIQUE(variable_set_id, key),
-                        FOREIGN KEY (variable_set_id) REFERENCES {self._table('variable_sets')}(id)
-                    )
-                    """
-                )
+                table_name = self._table('variable_set_variables')
+                if not self._table_exists(cursor, table_name):
+                    logger.info(f"Creating table: {table_name}")
+                    try:
+                        cursor.execute(
+                            f"""
+                            CREATE TABLE {table_name} (
+                                id TEXT PRIMARY KEY,
+                                variable_set_id TEXT NOT NULL,
+                                key TEXT NOT NULL,
+                                value TEXT NOT NULL,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                UNIQUE(variable_set_id, key),
+                                FOREIGN KEY (variable_set_id) REFERENCES {self._table('variable_sets')}(id)
+                            )
+                            """
+                        )
+                        logger.info(f"✓ Table {table_name} created")
+                    except Exception as e:
+                        logger.warning(f"Could not create variable_set_variables table: {e}")
+                else:
+                    logger.info(f"✓ Table {table_name} already exists")
 
-                cursor.execute(
-                    f"""
-                    CREATE TABLE IF NOT EXISTS {self._table('variable_set_selections')} (
-                        id TEXT PRIMARY KEY,
-                        prompt_id TEXT NOT NULL,
-                        variable_set_id TEXT NOT NULL,
-                        list_order INTEGER NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        UNIQUE(prompt_id, variable_set_id),
-                        FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id),
-                        FOREIGN KEY (variable_set_id) REFERENCES {self._table('variable_sets')}(id)
-                    )
-                    """
-                )
+                table_name = self._table('variable_set_selections')
+                if not self._table_exists(cursor, table_name):
+                    logger.info(f"Creating table: {table_name}")
+                    try:
+                        cursor.execute(
+                            f"""
+                            CREATE TABLE {table_name} (
+                                id TEXT PRIMARY KEY,
+                                prompt_id TEXT NOT NULL,
+                                variable_set_id TEXT NOT NULL,
+                                list_order INTEGER NOT NULL,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                UNIQUE(prompt_id, variable_set_id),
+                                FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id),
+                                FOREIGN KEY (variable_set_id) REFERENCES {self._table('variable_sets')}(id)
+                            )
+                            """
+                        )
+                        logger.info(f"✓ Table {table_name} created")
+                    except Exception as e:
+                        logger.warning(f"Could not create variable_set_selections table: {e}")
+                else:
+                    logger.info(f"✓ Table {table_name} already exists")
 
-                cursor.execute(
-                    f"""
-                    CREATE TABLE IF NOT EXISTS {self._table('variable_set_overrides')} (
-                        id TEXT PRIMARY KEY,
-                        prompt_id TEXT NOT NULL,
-                        variable_set_id TEXT NOT NULL,
-                        key TEXT NOT NULL,
-                        override_value TEXT NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        UNIQUE(prompt_id, variable_set_id, key),
-                        FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id),
-                        FOREIGN KEY (variable_set_id) REFERENCES {self._table('variable_sets')}(id)
-                    )
-                    """
-                )
+                table_name = self._table('variable_set_overrides')
+                if not self._table_exists(cursor, table_name):
+                    logger.info(f"Creating table: {table_name}")
+                    try:
+                        cursor.execute(
+                            f"""
+                            CREATE TABLE {table_name} (
+                                id TEXT PRIMARY KEY,
+                                prompt_id TEXT NOT NULL,
+                                variable_set_id TEXT NOT NULL,
+                                key TEXT NOT NULL,
+                                override_value TEXT NOT NULL,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                UNIQUE(prompt_id, variable_set_id, key),
+                                FOREIGN KEY (prompt_id) REFERENCES {self._table('prompts')}(id),
+                                FOREIGN KEY (variable_set_id) REFERENCES {self._table('variable_sets')}(id)
+                            )
+                            """
+                        )
+                        logger.info(f"✓ Table {table_name} created")
+                    except Exception as e:
+                        logger.warning(f"Could not create variable_set_overrides table: {e}")
+                else:
+                    logger.info(f"✓ Table {table_name} already exists")
 
                 logger.info("✓ Database schema successfully created/verified")
+                # Commit any pending changes
+                try:
+                    cursor.connection.commit()
+                except:
+                    pass
             except Exception as e:
                 logger.error(f"ERROR ensuring schema: {e}")
+                try:
+                    cursor.connection.rollback()
+                except:
+                    pass
                 raise
             finally:
-                # Disable autocommit after schema operations
-                cursor.connection.autocommit = False
+                # Disable autocommit after schema operations (PostgreSQL only)
+                try:
+                    cursor.connection.autocommit = False
+                except (AttributeError, TypeError):
+                    # SQLite and other databases don't support autocommit
+                    pass
+                try:
+                    cursor.connection.commit()
+                except:
+                    pass
 
     def refresh(self) -> None:
         """Refresh metadata from database (not content)."""
@@ -361,6 +446,7 @@ class DatabaseSource(PromptSource):
 
     def delete_prompt(self, name: str) -> None:
         """Delete a prompt and its associated data."""
+        self._ensure_connection()
         with self._get_cursor() as cursor:
             # Get prompt ID
             cursor.execute(
@@ -487,6 +573,7 @@ class DatabaseSource(PromptSource):
         if tags is None:
             tags = []
 
+        self._ensure_connection()
         with self._get_cursor() as cursor:
             # Check if prompt exists
             cursor.execute(
@@ -656,6 +743,7 @@ class DatabaseSource(PromptSource):
     def update_variable_set(self, set_id: str, name: Optional[str] = None, variables: Optional[Dict[str, str]] = None) -> None:
         """Update a variable set."""
         import uuid
+        self._ensure_connection()
         with self._get_cursor() as cursor:
             if name:
                 cursor.execute(
@@ -680,6 +768,7 @@ class DatabaseSource(PromptSource):
 
     def delete_variable_set(self, set_id: str) -> None:
         """Delete a variable set."""
+        self._ensure_connection()
         with self._get_cursor() as cursor:
             cursor.execute(
                 f"DELETE FROM {self._table('variable_set_variables')} WHERE variable_set_id = %s",
@@ -753,6 +842,7 @@ class DatabaseSource(PromptSource):
     def set_variable_overrides(self, prompt_id: str, set_id: str, overrides: Dict[str, str]) -> None:
         """Set override values for a specific set in a prompt."""
         import uuid
+        self._ensure_connection()
         with self._get_cursor() as cursor:
             # Remove existing overrides
             cursor.execute(

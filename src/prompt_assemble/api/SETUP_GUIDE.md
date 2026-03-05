@@ -28,7 +28,7 @@ echo "Hello [[NAME]]!" > prompts/greeting.prompt
 export PROMPT_ASSEMBLE_UI=true
 python -c "
 from prompt_assemble.sources import FileSystemSource
-from prompt_assemble.ui import run_server
+from prompt_assemble.api import run_server
 
 source = FileSystemSource('./prompts')
 run_server(source=source, port=5000, debug=True)
@@ -39,7 +39,7 @@ run_server(source=source, port=5000, debug=True)
 
 #### Install Dependencies
 ```bash
-cd src/prompt_assemble/ui/frontend
+cd src/prompt_assemble/api/frontend
 npm install
 ```
 
@@ -72,7 +72,7 @@ pip install flask flask-cors
 ### Step 2: Setup Frontend
 
 ```bash
-cd src/prompt_assemble/ui/frontend
+cd src/prompt_assemble/api/frontend
 
 # Install dependencies
 npm install
@@ -116,12 +116,12 @@ EOF
 ```bash
 export PROMPT_ASSEMBLE_UI=true
 cd /path/to/prompt-assemble
-python src/prompt_assemble/ui/example_usage.py
+python src/prompt_assemble/api/example_usage.py
 ```
 
 #### Terminal 2: Frontend Development
 ```bash
-cd /path/to/prompt-assemble/src/prompt_assemble/ui/frontend
+cd /path/to/prompt-assemble/src/prompt_assemble/api/frontend
 npm start
 ```
 
@@ -130,7 +130,7 @@ npm start
 ### Build Frontend
 
 ```bash
-cd src/prompt_assemble/ui/frontend
+cd src/prompt_assemble/api/frontend
 npm run build
 ```
 
@@ -141,7 +141,7 @@ The build output will be in `build/` directory.
 ```python
 from flask import Flask, send_from_directory
 from prompt_assemble.sources import FileSystemSource
-from prompt_assemble.ui import create_app
+from prompt_assemble.api import create_app
 import os
 
 # Create app with source
@@ -203,7 +203,7 @@ app = create_app(source=source, config=app_config)
 
 ```python
 from prompt_assemble.sources import FileSystemSource
-from prompt_assemble.ui import run_server
+from prompt_assemble.api import run_server
 
 source = FileSystemSource('./prompts')
 run_server(source=source)
@@ -226,7 +226,7 @@ prompts/
 ```python
 import sqlite3
 from prompt_assemble.sources import DatabaseSource
-from prompt_assemble.ui import run_server
+from prompt_assemble.api import run_server
 
 conn = sqlite3.connect('prompts.db')
 source = DatabaseSource(conn)
@@ -305,7 +305,7 @@ pip install flask-cors
 #### Port already in use
 ```bash
 # Change port
-python -c "from prompt_assemble.ui import run_server; run_server(port=8000)"
+python -c "from prompt_assemble.api import run_server; run_server(port=8000)"
 
 # Or kill existing process
 lsof -ti:5000 | xargs kill -9  # macOS/Linux
@@ -315,7 +315,7 @@ lsof -ti:5000 | xargs kill -9  # macOS/Linux
 
 #### Node modules not installed
 ```bash
-cd src/prompt_assemble/ui/frontend
+cd src/prompt_assemble/api/frontend
 rm -rf node_modules package-lock.json
 npm install
 ```
@@ -352,7 +352,7 @@ const API_URL = 'http://your-domain.com/api'
 
 ```python
 from prompt_assemble.sources import FileSystemSource
-from prompt_assemble.ui import run_server
+from prompt_assemble.api import run_server
 
 source = FileSystemSource('./prompts')
 
@@ -445,7 +445,7 @@ def custom_action(action):
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger('prompt_assemble.ui')
+logger = logging.getLogger('prompt_assemble.api')
 logger.setLevel(logging.DEBUG)
 ```
 
