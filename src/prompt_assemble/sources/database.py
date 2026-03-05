@@ -532,13 +532,13 @@ class DatabaseSource(PromptSource):
                 raise PromptNotFoundError(f"Prompt not found: {name} (version {version})")
             return str(row[0])
 
-    def find_by_tag(self, *tags: str) -> list[str]:
+    def find_by_tag(self, *tags: str) -> List[str]:
         """Find all prompt names matching ALL tags (AND intersection)."""
         if self._should_refresh():
             self.refresh()
         return self._registry.find_by_tags(*tags)
 
-    def list(self) -> list[str]:
+    def list(self) -> List[str]:
         """List all available prompt names."""
         if self._should_refresh():
             self.refresh()

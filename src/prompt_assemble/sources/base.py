@@ -1,7 +1,7 @@
 """Abstract base class for prompt sources."""
 
 from abc import ABC, abstractmethod
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 SourceListener = Callable[[str], None]  # event_type -> None
 
@@ -11,7 +11,7 @@ class PromptSource(ABC):
 
     def __init__(self):
         """Initialize the source with listener support."""
-        self._listeners: list[SourceListener] = []
+        self._listeners: List[SourceListener] = []
 
     def add_listener(self, listener: SourceListener) -> None:
         """
@@ -67,7 +67,7 @@ class PromptSource(ABC):
         pass
 
     @abstractmethod
-    def find_by_tag(self, *tags: str) -> list[str]:
+    def find_by_tag(self, *tags: str) -> List[str]:
         """
         Find all prompt names matching ALL tags (AND intersection).
 
@@ -80,7 +80,7 @@ class PromptSource(ABC):
         pass
 
     @abstractmethod
-    def list(self) -> list[str]:
+    def list(self) -> List[str]:
         """
         List all available prompt names.
 

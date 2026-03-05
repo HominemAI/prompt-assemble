@@ -10,14 +10,14 @@ Supports sigil-based substitution:
 
 import logging
 import re
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-TagResolver = Callable[[list[str]], list[str]]  # tags -> prompt names
+TagResolver = Callable[[List[str]], List[str]]  # tags -> prompt names
 
 
-def _parse_prompt_tag_sigil(content: str) -> Tuple[Optional[int], list[str]]:
+def _parse_prompt_tag_sigil(content: str) -> Tuple[Optional[int], List[str]]:
     """
     Parse PROMPT_TAG sigil content.
 

@@ -1,6 +1,6 @@
 """High-level provider for loading and rendering prompts."""
 
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from .core import substitute
 from .exceptions import PromptNotFoundError
@@ -71,7 +71,7 @@ class PromptProvider:
             return self.get_raw(comp_name)
 
         # Build tag resolver (finds prompts by tag, in reverse insertion order)
-        def _resolve_tags(tags: list[str]) -> list[str]:
+        def _resolve_tags(tags: List[str]) -> List[str]:
             matching = self.find_by_tag(*tags)
             # Return in reverse order (most recently loaded first)
             return list(reversed(matching))
@@ -86,7 +86,7 @@ class PromptProvider:
             tag_resolver=_resolve_tags,
         )
 
-    def find_by_tag(self, *tags: str) -> list[str]:
+    def find_by_tag(self, *tags: str) -> List[str]:
         """
         Find all prompt names matching ALL tags (AND intersection).
 
@@ -98,7 +98,7 @@ class PromptProvider:
         """
         return self.source.find_by_tag(*tags)
 
-    def list(self) -> list[str]:
+    def list(self) -> List[str]:
         """
         List all available prompt names.
 

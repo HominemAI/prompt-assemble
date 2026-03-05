@@ -1,7 +1,7 @@
 """In-memory registry for prompt metadata."""
 
 from dataclasses import dataclass, field
-from typing import Callable, Optional
+from typing import Any, Callable, List, Optional
 
 
 @dataclass
@@ -33,7 +33,7 @@ class Registry:
     def __init__(self):
         """Initialize the registry."""
         self._entries: dict[str, RegistryEntry] = {}
-        self._listeners: list[RegistryListener] = []
+        self._listeners: List[RegistryListener] = []
 
     def add_listener(self, listener: RegistryListener) -> None:
         """
@@ -87,7 +87,7 @@ class Registry:
         """Get a registry entry by name."""
         return self._entries.get(name)
 
-    def find_by_tags(self, *tags: str) -> list[str]:
+    def find_by_tags(self, *tags: str) -> List[str]:
         """Find all prompt names matching ALL tags (AND intersection)."""
         if not tags:
             return self.list_names()
@@ -99,7 +99,7 @@ class Registry:
 
         return matching_names
 
-    def list_names(self) -> list[str]:
+    def list_names(self) -> List[str]:
         """List all registered prompt names in insertion order."""
         return list(self._entries.keys())
 
