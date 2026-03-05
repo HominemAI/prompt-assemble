@@ -2,6 +2,7 @@
 
 import logging
 import os
+from typing import Optional
 from .base import PromptSource
 from .filesystem import FileSystemSource
 from .database import DatabaseSource
@@ -16,7 +17,7 @@ __all__ = [
 ]
 
 
-def create_database_source_from_env(table_prefix: str = None) -> DatabaseSource:
+def create_database_source_from_env(table_prefix: Optional[str] = None) -> DatabaseSource:
     """
     Create a DatabaseSource from PostgreSQL environment variables.
 

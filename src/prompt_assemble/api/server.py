@@ -130,8 +130,10 @@ def create_app(source=None, config=None):
                     finally:
                         cursor.close()
                 except Exception as db_error:
-                    logger.error(f"[list_prompts] DATABASE ERROR: Failed to fetch timestamps from database: {type(db_error).__name__}: {db_error}")
-                    logger.error(f"[list_prompts] Database connection details: {app.prompt_source.connection if hasattr(app.prompt_source, 'connection') else 'No connection object'}")
+                    logger.error(
+                        f"[list_prompts] DATABASE ERROR: Failed to fetch timestamps from database: {type(db_error).__name__}: {db_error}")
+                    logger.error(
+                        f"[list_prompts] Database connection details: {app.prompt_source.connection if hasattr(app.prompt_source, 'connection') else 'No connection object'}")
                     # Continue without timestamps rather than failing completely
                     logger.warning("[list_prompts] Proceeding without database timestamps")
 
@@ -150,7 +152,8 @@ def create_app(source=None, config=None):
                 prompts.append(prompt_data)
 
             elapsed = time.time() - start_time
-            logger.info(f"[list_prompts] Returned {len(prompts)} prompts (skipped {skipped_count} untitled), took {elapsed:.3f}s")
+            logger.info(
+                f"[list_prompts] Returned {len(prompts)} prompts (skipped {skipped_count} untitled), took {elapsed:.3f}s")
 
             return jsonify({"prompts": prompts})
         except Exception as e:
@@ -463,7 +466,8 @@ def create_app(source=None, config=None):
 
             app.prompt_source.connection.commit()
 
-            logger.info(f"[revert_prompt] Successfully reverted {name} to version {version} (new version: {new_version})")
+            logger.info(
+                f"[revert_prompt] Successfully reverted {name} to version {version} (new version: {new_version})")
             return jsonify({
                 "success": True,
                 "name": name,
@@ -578,7 +582,8 @@ def create_app(source=None, config=None):
                     metadata = _get_prompt_metadata(app.prompt_source, name)
                     tags.update(metadata.get("tags", []))
                 except Exception as metadata_error:
-                    logger.error(f"[list_tags] DATABASE ERROR getting metadata for '{name}': {type(metadata_error).__name__}: {metadata_error}")
+                    logger.error(
+                        f"[list_tags] DATABASE ERROR getting metadata for '{name}': {type(metadata_error).__name__}: {metadata_error}")
                     # Continue with other prompts rather than failing completely
                     continue
 
@@ -855,7 +860,7 @@ def _get_index_html() -> str:
 
 
 def run_server(
-    source=None, host: str = "127.0.0.1", port: int = None, debug: bool = False
+        source=None, host: str = "127.0.0.1", port: Optional[int] = None, debug: bool = False
 ):
     """
     Run the REST API server.

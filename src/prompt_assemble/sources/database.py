@@ -90,7 +90,7 @@ class DatabaseSource(PromptSource):
 
         # Auto-refresh configuration
         self.refresh_interval_seconds = int(os.getenv("PROMPT_ASSEMBLE_REFRESH_INTERVAL", "30"))
-        self._last_refresh_time = 0
+        self._last_refresh_time: float = 0.0
 
         # Verify connection and initialize schema
         try:
@@ -141,7 +141,8 @@ class DatabaseSource(PromptSource):
             "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name=%s)",
             (table_name,)
         )
-        return cursor.fetchone()[0]
+        result = cursor.fetchone()
+        return bool(result[0]) if result else False
 
     def _ensure_schema(self) -> None:
         """Ensure database schema exists."""
@@ -442,7 +443,7 @@ class DatabaseSource(PromptSource):
             row = cursor.fetchone()
             if row is None:
                 raise PromptNotFoundError(f"Prompt not found: {name}")
-            return row[0]
+            return str(row[0])
 
     def delete_prompt(self, name: str) -> None:
         """Delete a prompt and its associated data."""
@@ -529,7 +530,7 @@ class DatabaseSource(PromptSource):
             row = cursor.fetchone()
             if row is None:
                 raise PromptNotFoundError(f"Prompt not found: {name} (version {version})")
-            return row[0]
+            return str(row[0])
 
     def find_by_tag(self, *tags: str) -> list[str]:
         """Find all prompt names matching ALL tags (AND intersection)."""
@@ -544,14 +545,14 @@ class DatabaseSource(PromptSource):
         return self._registry.list_names()
 
     def save_prompt(
-        self,
-        name: str,
-        content: str,
-        description: str = "",
-        tags: Optional[List[str]] = None,
-        owner: Optional[str] = None,
-        increment_version: bool = True,
-        revision_comment: Optional[str] = None,
+            self,
+            name: str,
+            content: str,
+            description: str = "",
+            tags: Optional[List[str]] = None,
+            owner: Optional[str] = None,
+            increment_version: bool = True,
+            revision_comment: Optional[str] = None,
     ) -> str:
         """
         Save or update a prompt.
@@ -600,7 +601,8 @@ class DatabaseSource(PromptSource):
                 # Only increment version for real saves, not cache saves
                 new_version = current_version + 1 if increment_version else current_version
 
-                logger.debug(f"Updating existing prompt {name}: current_version={current_version}, new_version={new_version}, increment_version={increment_version}")
+                logger.debug(
+                    f"Updating existing prompt {name}: current_version={current_version}, new_version={new_version}, increment_version={increment_version}")
 
                 # Update prompt
                 cursor.execute(
@@ -740,7 +742,8 @@ class DatabaseSource(PromptSource):
                 sets.append({"id": set_id, "name": name, "variables": variables})
             return sets
 
-    def update_variable_set(self, set_id: str, name: Optional[str] = None, variables: Optional[Dict[str, str]] = None) -> None:
+    def update_variable_set(self, set_id: str, name: Optional[str] = None,
+                            variables: Optional[Dict[str, str]] = None) -> None:
         """Update a variable set."""
         import uuid
         self._ensure_connection()

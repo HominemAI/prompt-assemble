@@ -8,9 +8,9 @@ version = "0.1.0"
 description = "A lightweight prompt assembly library using sigil-based substitution"
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "MIT"}
+license = { text = "MIT" }
 authors = [
-    {name = "Your Name", email = "your.email@example.com"},
+    { name = "Your Name", email = "your.email@example.com" },
 ]
 keywords = ["prompt", "llm", "template", "assembly", "pxml"]
 classifiers = [
@@ -59,7 +59,7 @@ Issues = "https://github.com/yourusername/prompt-assemble/issues"
 pambl = "prompt_assemble.cli:main"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -73,7 +73,8 @@ profile = "black"
 line_length = 100
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
+no_implicit_optional = true

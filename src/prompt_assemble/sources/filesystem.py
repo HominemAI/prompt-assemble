@@ -140,7 +140,8 @@ class FileSystemSource(PromptSource):
             return {}
 
         try:
-            return json.loads(registry_file.read_text(encoding="utf-8"))
+            data = json.loads(registry_file.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
         except Exception as e:
             logger.warning(f"Failed to load registry from {registry_file}: {e}")
             return {}

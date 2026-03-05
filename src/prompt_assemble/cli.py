@@ -17,7 +17,8 @@ def load_json_file(path: str) -> Dict[str, Any]:
     """Load a JSON file."""
     try:
         with open(path, 'r') as f:
-            return json.load(f)
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
     except FileNotFoundError:
         print(f"Error: File not found: {path}", file=sys.stderr)
         sys.exit(1)
