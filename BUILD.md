@@ -40,13 +40,16 @@ The app will be available at **http://localhost:5000**
 #### Option 1: Watch Mode (Recommended for Development)
 
 **Terminal 1 - Frontend Dev Server**
+
 ```bash
 cd src/prompt_assemble/api/frontend
 npm run dev
 ```
+
 This starts Vite dev server at http://localhost:5173 with hot reload
 
 **Terminal 2 - Flask Backend**
+
 ```bash
 python -m prompt_assemble.api.server
 ```
@@ -90,11 +93,13 @@ python -m prompt_assemble.api.server
 ### Environment Variables
 
 For the UI to work, ensure:
+
 ```bash
 export PROMPT_ASSEMBLE_UI=true
 ```
 
 For database backend:
+
 ```bash
 export DB_HOSTNAME=localhost
 export DB_PORT=5432
@@ -108,6 +113,7 @@ export DB_DATABASE=prompts
 ### Static Files Not Found
 
 If you see blank page with 404 errors for static files:
+
 1. Make sure you ran `npm run build`
 2. Check that `src/prompt_assemble/api/static/` directory exists
 3. Verify `index.html` is in the static directory
@@ -122,6 +128,7 @@ python -m prompt_assemble.api.server --port 8000
 ### Module Import Errors
 
 Make sure you installed Python package in development mode:
+
 ```bash
 cd /Users/asanchez/DevWorkspace/prompt-assemble
 pip install -e .
@@ -130,6 +137,7 @@ pip install -e .
 ## Production Deployment
 
 For production:
+
 1. Build the frontend: `npm run build`
 2. Use a production WSGI server (gunicorn, uwsgi, etc.)
 3. Serve static files with a CDN or web server (nginx)

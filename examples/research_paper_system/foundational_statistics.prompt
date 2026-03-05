@@ -2,30 +2,30 @@
 #! Tagged as reference and foundational for tag-based injection
 
 <foundational_concept>
-  <topic>Statistical Hypothesis Testing</topic>
+<topic>Statistical Hypothesis Testing</topic>
 
-  <definition>
-  Hypothesis testing is a formal statistical method to evaluate claims about a population based on sample data. It involves formulating null and alternative hypotheses, calculating test statistics, and determining statistical significance.
-  </definition>
+<definition>
+Hypothesis testing is a formal statistical method to evaluate claims about a population based on sample data. It involves formulating null and alternative hypotheses, calculating test statistics, and determining statistical significance.
+</definition>
 
-  <core_concepts>
-  1. Null Hypothesis (H0): Assumes no effect or no difference exists
-  2. Alternative Hypothesis (H1): Claims an effect or difference exists
-  3. P-value: Probability of observing results as extreme as actual data, given H0 is true
-  4. Significance Level (α): Threshold (typically 0.05) for rejecting the null hypothesis
-  5. Type I Error: Rejecting true null hypothesis (false positive)
-  6. Type II Error: Failing to reject false null hypothesis (false negative)
-  </core_concepts>
+<core_concepts>
+1. Null Hypothesis (H0): Assumes no effect or no difference exists
+2. Alternative Hypothesis (H1): Claims an effect or difference exists
+3. P-value: Probability of observing results as extreme as actual data, given H0 is true
+4. Significance Level (α): Threshold (typically 0.05) for rejecting the null hypothesis
+5. Type I Error: Rejecting true null hypothesis (false positive)
+6. Type II Error: Failing to reject false null hypothesis (false negative)
+</core_concepts>
 
-  <common_tests>
-  - t-test: Compares means of two groups
-  - ANOVA: Compares means across multiple groups
-  - Chi-square: Tests independence of categorical variables
-  - Correlation Analysis: Measures relationship strength between variables
-  - Regression: Models relationship between dependent and independent variables
-  </common_tests>
+<common_tests>
+- t-test: Compares means of two groups
+- ANOVA: Compares means across multiple groups
+- Chi-square: Tests independence of categorical variables
+- Correlation Analysis: Measures relationship strength between variables
+- Regression: Models relationship between dependent and independent variables
+</common_tests>
 
-  <research_importance>
-  Proper hypothesis testing provides objective criteria for determining whether observed research results are statistically significant or due to random chance, ensuring reproducibility and credibility of scientific findings.
-  </research_importance>
+<research_importance>
+Proper hypothesis testing provides objective criteria for determining whether observed research results are statistically significant or due to random chance, ensuring reproducibility and credibility of scientific findings.
+</research_importance>
 </foundational_concept>

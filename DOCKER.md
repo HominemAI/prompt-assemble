@@ -39,19 +39,23 @@ docker run -p 5000:5000 \
 ## Docker Image Details
 
 ### Base Image
+
 - **Python:** 3.11-slim (optimized for smaller size)
 - **OS:** Debian Linux (minimal)
 - **Size:** ~300-400 MB
 
 ### Components
+
 - prompt-assemble core library
 - Flask-based UI server
 - All dependencies
 
 ### Exposed Port
+
 - **5000** - Flask web UI server
 
 ### Health Check
+
 - HTTP GET to `/` every 30 seconds
 - 5 second startup grace period
 - 10 second timeout
@@ -150,7 +154,7 @@ services:
     volumes:
       - prompts:/app/prompts
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      test: [ "CMD", "curl", "-f", "http://localhost:5000/" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -161,6 +165,7 @@ volumes:
 ```
 
 Run with:
+
 ```bash
 docker-compose up
 ```
@@ -192,7 +197,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      test: [ "CMD", "curl", "-f", "http://localhost:5000/" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -206,7 +211,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
+      test: [ "CMD", "pg_isready", "-U", "postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -221,6 +226,7 @@ volumes:
 See [README.md - Environment Variables](./README.md#environment-variables) for complete reference.
 
 Key variables for Docker:
+
 - `PROMPT_ASSEMBLE_UI=true` - Enable web UI
 - `FLASK_HOST=0.0.0.0` - Listen on all interfaces
 - `FLASK_PORT=5000` - Server port
@@ -228,10 +234,10 @@ Key variables for Docker:
 
 ## Volume Mounts
 
-| Path | Purpose | Optional |
-|------|---------|----------|
-| `/app/prompts` | Filesystem-based prompts | Yes |
-| `/app/db` | Database files (SQLite) | Yes |
+| Path           | Purpose                  | Optional |
+|----------------|--------------------------|----------|
+| `/app/prompts` | Filesystem-based prompts | Yes      |
+| `/app/db`      | Database files (SQLite)  | Yes      |
 
 ## Networking
 
@@ -268,35 +274,35 @@ spec:
         app: prompt-assemble
     spec:
       containers:
-      - name: prompt-assemble
-        image: ghcr.io/AgentSanchez/prompt-assemble:latest
-        ports:
-        - containerPort: 5000
-        env:
-        - name: PROMPT_ASSEMBLE_UI
-          value: "true"
-        - name: FLASK_HOST
-          value: "0.0.0.0"
-        - name: PROMPT_ASSEMBLE_TABLE_PREFIX
-          value: "k8s_"
-        volumeMounts:
-        - name: prompts
-          mountPath: /app/prompts
-        livenessProbe:
-          httpGet:
-            path: /
-            port: 5000
-          initialDelaySeconds: 10
-          periodSeconds: 30
-        readinessProbe:
-          httpGet:
-            path: /
-            port: 5000
-          initialDelaySeconds: 5
-          periodSeconds: 10
+        - name: prompt-assemble
+          image: ghcr.io/AgentSanchez/prompt-assemble:latest
+          ports:
+            - containerPort: 5000
+          env:
+            - name: PROMPT_ASSEMBLE_UI
+              value: "true"
+            - name: FLASK_HOST
+              value: "0.0.0.0"
+            - name: PROMPT_ASSEMBLE_TABLE_PREFIX
+              value: "k8s_"
+          volumeMounts:
+            - name: prompts
+              mountPath: /app/prompts
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
       volumes:
-      - name: prompts
-        emptyDir: {}
+        - name: prompts
+          emptyDir: { }
 ---
 apiVersion: v1
 kind: Service
@@ -306,8 +312,8 @@ spec:
   selector:
     app: prompt-assemble
   ports:
-  - port: 5000
-    targetPort: 5000
+    - port: 5000
+      targetPort: 5000
   type: LoadBalancer
 ```
 
@@ -320,16 +326,16 @@ metadata:
   name: prompt-assemble
 spec:
   hosts:
-  - prompt-assemble
+    - prompt-assemble
   http:
-  - match:
-    - uri:
-        prefix: /
-    route:
-    - destination:
-        host: prompt-assemble
-        port:
-          number: 5000
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: prompt-assemble
+            port:
+              number: 5000
 ```
 
 ## Image Variants
@@ -356,6 +362,7 @@ ENTRYPOINT ["python", "-m", "prompt_assemble.api"]
 ```
 
 Build and run:
+
 ```bash
 docker build -f Dockerfile.custom -t my-prompts:1.0 .
 docker run -p 5000:5000 my-prompts:1.0
@@ -438,6 +445,7 @@ docker run -it \
 ### Multi-stage build
 
 The Dockerfile uses multi-stage builds to minimize image size:
+
 1. **Builder stage** - Installs dependencies
 2. **Runtime stage** - Only includes necessary files
 

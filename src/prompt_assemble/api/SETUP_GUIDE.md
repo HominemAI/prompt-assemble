@@ -5,6 +5,7 @@ Complete guide for setting up and running the Prompt Manager web interface.
 ## Quick Start
 
 ### Prerequisites
+
 - Python 3.8+
 - Node.js 16+ and npm
 - Flask for backend
@@ -13,17 +14,20 @@ Complete guide for setting up and running the Prompt Manager web interface.
 ### 1. Backend Setup
 
 #### Install Dependencies
+
 ```bash
 pip install flask flask-cors prompt-assemble
 ```
 
 #### Create a Prompts Directory (Optional)
+
 ```bash
 mkdir prompts
 echo "Hello [[NAME]]!" > prompts/greeting.prompt
 ```
 
 #### Run the Server
+
 ```bash
 export PROMPT_ASSEMBLE_UI=true
 python -c "
@@ -38,12 +42,14 @@ run_server(source=source, port=5000, debug=True)
 ### 2. Frontend Setup
 
 #### Install Dependencies
+
 ```bash
 cd src/prompt_assemble/api/frontend
 npm install
 ```
 
 #### Start Development Server
+
 ```bash
 npm start
 ```
@@ -53,6 +59,7 @@ The app will automatically open at `http://localhost:3000`
 ### 3. Access the UI
 
 Open your browser and navigate to:
+
 - Development: `http://localhost:3000`
 - Production: `http://localhost:5000`
 
@@ -113,6 +120,7 @@ EOF
 ### Step 4: Run Both Backend and Frontend
 
 #### Terminal 1: Backend Server
+
 ```bash
 export PROMPT_ASSEMBLE_UI=true
 cd /path/to/prompt-assemble
@@ -120,6 +128,7 @@ python src/prompt_assemble/api/example_usage.py
 ```
 
 #### Terminal 2: Frontend Development
+
 ```bash
 cd /path/to/prompt-assemble/src/prompt_assemble/api/frontend
 npm start
@@ -210,6 +219,7 @@ run_server(source=source)
 ```
 
 **Directory Structure:**
+
 ```
 prompts/
 ├── greeting.prompt
@@ -292,17 +302,20 @@ exported = response.json()['export']
 ### Backend Issues
 
 #### Flask not found
+
 ```bash
 pip install flask flask-cors
 ```
 
 #### CORS errors
+
 ```bash
 pip install flask-cors
 # Make sure it's imported in server.py
 ```
 
 #### Port already in use
+
 ```bash
 # Change port
 python -c "from prompt_assemble.api import run_server; run_server(port=8000)"
@@ -314,6 +327,7 @@ lsof -ti:5000 | xargs kill -9  # macOS/Linux
 ### Frontend Issues
 
 #### Node modules not installed
+
 ```bash
 cd src/prompt_assemble/api/frontend
 rm -rf node_modules package-lock.json
@@ -321,6 +335,7 @@ npm install
 ```
 
 #### React not starting
+
 ```bash
 # Check Node version
 node --version  # Should be 16+
@@ -331,6 +346,7 @@ npm start
 ```
 
 #### Blank page
+
 1. Check browser console for errors (F12)
 2. Verify backend is running: `curl http://localhost:5000/api/prompts`
 3. Check that API responses are valid JSON
@@ -338,6 +354,7 @@ npm start
 ### Connection Issues
 
 #### Can't connect to backend from frontend
+
 ```javascript
 // In Development: Check frontend package.json
 // Add proxy: "http://localhost:5000"
@@ -373,11 +390,13 @@ run_server(source=source)
 ### Caching
 
 The UI uses in-memory caching for:
+
 - Auto-save drafts
 - Undo/redo history
 - Loaded prompts
 
 Configure cache size:
+
 ```python
 # In components
 const CACHE_MAX_SIZE = 100;  // MB
@@ -386,6 +405,7 @@ const CACHE_MAX_SIZE = 100;  // MB
 ### Large Prompt Sets
 
 For 1000+ prompts:
+
 1. Use database source (faster than filesystem)
 2. Enable pagination in explorer
 3. Lazy-load prompt content
@@ -458,13 +478,13 @@ logger.setLevel(logging.DEBUG)
 
 ### Common Issues & Solutions
 
-| Issue | Solution |
-|-------|----------|
-| Blank editor | Refresh page, check backend |
-| Slow search | Use database source, increase page size |
-| Save not working | Verify backend API is running |
-| Tags not showing | Reload prompts (refresh button) |
-| Autocomplete not appearing | Type `[[PROMPT:` to trigger |
+| Issue                      | Solution                                |
+|----------------------------|-----------------------------------------|
+| Blank editor               | Refresh page, check backend             |
+| Slow search                | Use database source, increase page size |
+| Save not working           | Verify backend API is running           |
+| Tags not showing           | Reload prompts (refresh button)         |
+| Autocomplete not appearing | Type `[[PROMPT:` to trigger             |
 
 ## Next Steps
 

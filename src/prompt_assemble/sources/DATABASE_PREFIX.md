@@ -2,7 +2,8 @@
 
 ## Database Backend
 
-**The primary data backend is PostgreSQL.** The `DatabaseSource` class uses DBAPI2-compatible database drivers, supporting:
+**The primary data backend is PostgreSQL.** The `DatabaseSource` class uses DBAPI2-compatible database drivers,
+supporting:
 
 - **PostgreSQL** (recommended for production)
 - SQLite (development/testing)
@@ -50,13 +51,13 @@ source = DatabaseSource(conn, table_prefix="prod_")
 
 Configure PostgreSQL connection using environment variables:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
+| Variable      | Default     | Description                |
+|---------------|-------------|----------------------------|
 | `DB_HOSTNAME` | `localhost` | PostgreSQL server hostname |
-| `DB_PORT` | `5432` | PostgreSQL server port |
-| `DB_USERNAME` | `postgres` | PostgreSQL username |
-| `DB_PASSWORD` | (required) | PostgreSQL password |
-| `DB_DATABASE` | `prompts` | PostgreSQL database name |
+| `DB_PORT`     | `5432`      | PostgreSQL server port     |
+| `DB_USERNAME` | `postgres`  | PostgreSQL username        |
+| `DB_PASSWORD` | (required)  | PostgreSQL password        |
+| `DB_DATABASE` | `prompts`   | PostgreSQL database name   |
 
 ```bash
 export DB_HOSTNAME=postgres.example.com
@@ -76,7 +77,9 @@ source = create_database_source_from_env()
 
 ## Table Prefix Feature
 
-The `DatabaseSource` supports configurable table name prefixes, allowing multiple independent prompt databases to coexist in the same database instance. This is useful for multi-tenant applications, testing environments, or when you need to avoid table name collisions.
+The `DatabaseSource` supports configurable table name prefixes, allowing multiple independent prompt databases to
+coexist in the same database instance. This is useful for multi-tenant applications, testing environments, or when you
+need to avoid table name collisions.
 
 ## Configuration
 
@@ -92,6 +95,7 @@ python your_script.py
 ```
 
 All tables will be prefixed with `myapp_`:
+
 - `myapp_prompts`
 - `myapp_prompt_registry`
 - `myapp_prompt_tags`
@@ -192,6 +196,7 @@ CREATE TABLE prompt_versions (...)
 ## Database Schema Details
 
 ### Table: `{prefix}prompts`
+
 - `id` (TEXT, PRIMARY KEY)
 - `name` (TEXT, UNIQUE)
 - `content` (TEXT)
@@ -200,6 +205,7 @@ CREATE TABLE prompt_versions (...)
 - `updated_at` (TIMESTAMP)
 
 ### Table: `{prefix}prompt_registry`
+
 - `id` (TEXT, PRIMARY KEY)
 - `prompt_id` (TEXT, FK to prompts)
 - `description` (TEXT)
@@ -208,11 +214,13 @@ CREATE TABLE prompt_versions (...)
 - `updated_at` (TIMESTAMP)
 
 ### Table: `{prefix}prompt_tags`
+
 - `prompt_id` (TEXT, FK to prompts)
 - `tag` (TEXT)
 - `PRIMARY KEY (prompt_id, tag)`
 
 ### Table: `{prefix}prompt_versions`
+
 - `id` (TEXT, PRIMARY KEY)
 - `prompt_id` (TEXT, FK to prompts)
 - `version` (INTEGER)
@@ -322,12 +330,13 @@ python -m pytest tests/ -v
 ## Important Notes
 
 1. **Prefix Format**: Use alphanumeric characters and underscores. Common patterns:
-   - `app_` - application name
-   - `tenant_a_` - tenant identifier
-   - `test_` - testing environment
-   - `dev_` - development environment
+    - `app_` - application name
+    - `tenant_a_` - tenant identifier
+    - `test_` - testing environment
+    - `dev_` - development environment
 
-2. **SQL Injection**: The prefix is NOT user-input validated in constructor for flexibility. If accepting user input, validate it:
+2. **SQL Injection**: The prefix is NOT user-input validated in constructor for flexibility. If accepting user input,
+   validate it:
    ```python
    import re
 
@@ -412,8 +421,10 @@ DatabaseSource(
 ```
 
 **Parameters:**
+
 - `connection`: DBAPI2-compatible database connection
-- `table_prefix`: Optional table name prefix. If not provided, reads from `PROMPT_ASSEMBLE_TABLE_PREFIX` environment variable. Defaults to empty string.
+- `table_prefix`: Optional table name prefix. If not provided, reads from `PROMPT_ASSEMBLE_TABLE_PREFIX` environment
+  variable. Defaults to empty string.
 
 **Returns:** DatabaseSource instance
 

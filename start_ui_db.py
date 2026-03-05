@@ -34,6 +34,7 @@ if __name__ == "__main__":
 
         logger.info(f"Connecting to PostgreSQL: {db_user}@{db_host}:{db_port}/{db_name}")
 
+
         # Create PostgreSQL connection from environment variables
         def create_connection():
             """Factory function to create new database connections."""
@@ -45,6 +46,7 @@ if __name__ == "__main__":
                 password=os.getenv("DB_PASSWORD", ""),
                 sslmode=db_sslmode,
             )
+
 
         conn = create_connection()
         logger.info("✓ Connected to PostgreSQL")
@@ -80,5 +82,6 @@ if __name__ == "__main__":
     except Exception as e:
         logger.exception(f"Fatal error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

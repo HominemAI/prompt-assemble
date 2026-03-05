@@ -1,6 +1,7 @@
 # prompt-assemble
 
-A lightweight prompt assembly library for building dynamic prompts with sigil-based substitution. No logic in templates — templates stay dumb, logic stays in Python.
+A lightweight prompt assembly library for building dynamic prompts with sigil-based substitution. No logic in
+templates — templates stay dumb, logic stays in Python.
 
 ## Features
 
@@ -53,12 +54,15 @@ print(result)
 ## Format Support
 
 ### Loose XML
+
 ```xml
+
 <system>You are a [[PROMPT: persona]]</system>
 <task>[[PROMPT: task-instructions]]</task>
 ```
 
 ### JSON
+
 ```json
 {
   "system": "You are a [[PROMPT: persona]]",
@@ -67,6 +71,7 @@ print(result)
 ```
 
 ### Plain Text
+
 ```
 Subject: [[SUBJECT]]
 
@@ -76,12 +81,12 @@ Body:
 
 ## Sigil Syntax
 
-| Sigil | Purpose |
-|-------|---------|
-| `[[VAR_NAME]]` | Simple variable substitution |
-| `[[PROMPT: name]]` | Inject a named prompt component |
-| `[[PROMPT_TAG: tag1, tag2]]` | Inject all prompts matching tags (AND intersection) |
-| `[[PROMPT_TAG:N: tag1, tag2]]` | Inject N most recent prompts matching tags |
+| Sigil                          | Purpose                                             |
+|--------------------------------|-----------------------------------------------------|
+| `[[VAR_NAME]]`                 | Simple variable substitution                        |
+| `[[PROMPT: name]]`             | Inject a named prompt component                     |
+| `[[PROMPT_TAG: tag1, tag2]]`   | Inject all prompts matching tags (AND intersection) |
+| `[[PROMPT_TAG:N: tag1, tag2]]` | Inject N most recent prompts matching tags          |
 
 ## Comments
 
@@ -115,7 +120,8 @@ pambl --template prompt.prompt --components components.json --variables vars.jso
 
 ## Database
 
-**PostgreSQL is required.** The DatabaseSource implementation uses PostgreSQL-specific features including automatic reconnection on timeout and transaction management optimized for reliability.
+**PostgreSQL is required.** The DatabaseSource implementation uses PostgreSQL-specific features including automatic
+reconnection on timeout and transaction management optimized for reliability.
 
 ### PostgreSQL Support
 
@@ -143,6 +149,7 @@ source = DatabaseSource(conn, table_prefix="prod_")
 
 # Use with PromptProvider
 from prompt_assemble import PromptProvider
+
 provider = PromptProvider(source)
 ```
 
@@ -163,6 +170,7 @@ python start_ui_db.py
 ```
 
 This script automatically:
+
 - Connects to PostgreSQL using environment variables
 - Initializes the database schema
 - Starts the Flask UI server
@@ -170,18 +178,19 @@ This script automatically:
 
 ### Database Configuration (PostgreSQL)
 
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `DB_HOSTNAME` | string | `localhost` | PostgreSQL server hostname |
-| `DB_PORT` | int | `5432` | PostgreSQL server port |
-| `DB_USERNAME` | string | `postgres` | PostgreSQL username |
-| `DB_PASSWORD` | string | (required) | PostgreSQL password |
-| `DB_DATABASE` | string | `prompts` | PostgreSQL database name |
-| `DB_SSLMODE` | string | `require` | SSL mode: `require`, `prefer`, `disable` |
-| `DB_PREFIX` | string | `pambl_` | Table name prefix (e.g., tables become `pambl_prompts`, `pambl_prompt_tags`) |
-| `PORT` | int | `8000` | Port for the Flask UI server |
+| Variable      | Type   | Default     | Description                                                                  |
+|---------------|--------|-------------|------------------------------------------------------------------------------|
+| `DB_HOSTNAME` | string | `localhost` | PostgreSQL server hostname                                                   |
+| `DB_PORT`     | int    | `5432`      | PostgreSQL server port                                                       |
+| `DB_USERNAME` | string | `postgres`  | PostgreSQL username                                                          |
+| `DB_PASSWORD` | string | (required)  | PostgreSQL password                                                          |
+| `DB_DATABASE` | string | `prompts`   | PostgreSQL database name                                                     |
+| `DB_SSLMODE`  | string | `require`   | SSL mode: `require`, `prefer`, `disable`                                     |
+| `DB_PREFIX`   | string | `pambl_`    | Table name prefix (e.g., tables become `pambl_prompts`, `pambl_prompt_tags`) |
+| `PORT`        | int    | `8000`      | Port for the Flask UI server                                                 |
 
 **Example - Local PostgreSQL:**
+
 ```bash
 export DB_HOSTNAME=localhost
 export DB_PORT=5432
@@ -195,6 +204,7 @@ python start_ui_db.py
 ```
 
 **Example - DigitalOcean Managed PostgreSQL:**
+
 ```bash
 export DB_HOSTNAME=db-postgresql-sfo2-xxxx-do-user-xxxxx-0.e.db.ondigitalocean.com
 export DB_PORT=25060
@@ -210,16 +220,16 @@ python start_ui_db.py
 
 ### Programmatic Configuration (Legacy)
 
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `PROMPT_ASSEMBLE_UI` | bool | `false` | Enable/disable the web UI server. Set to `"true"` to activate |
-| `PROMPT_ASSEMBLE_TABLE_PREFIX` | string | `""` (empty) | Table prefix (deprecated - use `DB_PREFIX` instead) |
+| Variable                       | Type   | Default      | Description                                                   |
+|--------------------------------|--------|--------------|---------------------------------------------------------------|
+| `PROMPT_ASSEMBLE_UI`           | bool   | `false`      | Enable/disable the web UI server. Set to `"true"` to activate |
+| `PROMPT_ASSEMBLE_TABLE_PREFIX` | string | `""` (empty) | Table prefix (deprecated - use `DB_PREFIX` instead)           |
 
 ### Listener & Event Configuration
 
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| None currently | - | - | Listener callbacks are configured programmatically |
+| Variable       | Type | Default | Description                                        |
+|----------------|------|---------|----------------------------------------------------|
+| None currently | -    | -       | Listener callbacks are configured programmatically |
 
 ## Configuration Examples
 
@@ -335,6 +345,7 @@ The DatabaseSource automatically handles connection timeouts and network interru
 - **Timeout recovery** — Handles PostgreSQL idle timeout gracefully
 
 No configuration required — reconnection happens automatically on these operations:
+
 - `save_prompt()` - Save/update prompts
 - `delete_prompt()` - Delete prompts
 - `refresh()` - Reload metadata
@@ -359,7 +370,8 @@ pytest tests/ -k "not test_database"
 PGHOST=localhost PGUSER=postgres PGPASSWORD=secret PGDATABASE=test_prompts pytest tests/test_database_source.py
 ```
 
-**Test Coverage:** 118 passing tests covering core library, FileSystem source, and listener system. PostgreSQL-specific tests are marked as requiring PostgreSQL.
+**Test Coverage:** 118 passing tests covering core library, FileSystem source, and listener system. PostgreSQL-specific
+tests are marked as requiring PostgreSQL.
 
 ## Contributing
 

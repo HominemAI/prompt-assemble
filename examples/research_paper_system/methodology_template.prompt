@@ -1,24 +1,24 @@
 #! Methodology Template - Used by research_paper_generator
 
 <methodology>
-  <approach>[[METHODOLOGY_BRIEF]]</approach>
+<approach>[[METHODOLOGY_BRIEF]]</approach>
 
-  <design>[[RESEARCH_DESIGN]]</design>
+<design>[[RESEARCH_DESIGN]]</design>
 
-  <participants>[[PARTICIPANT_DESCRIPTION]]</participants>
+<participants>[[PARTICIPANT_DESCRIPTION]]</participants>
 
-  <data_collection>
-    <method>[[DATA_COLLECTION_METHOD]]</method>
-    <duration>[[STUDY_DURATION]]</duration>
-    <tools>[[RESEARCH_TOOLS]]</tools>
-  </data_collection>
+<data_collection>
+<method>[[DATA_COLLECTION_METHOD]]</method>
+<duration>[[STUDY_DURATION]]</duration>
+<tools>[[RESEARCH_TOOLS]]</tools>
+</data_collection>
 
-  <analysis>
-    <statistical_method>[[STATISTICAL_METHOD]]</statistical_method>
-    <confidence_level>[[CONFIDENCE_LEVEL]]</confidence_level>
-  </analysis>
+<analysis>
+<statistical_method>[[STATISTICAL_METHOD]]</statistical_method>
+<confidence_level>[[CONFIDENCE_LEVEL]]</confidence_level>
+</analysis>
 
-  <validation>
+<validation>
 [[PROMPT: validation_checklist]]
-  </validation>
+</validation>
 </methodology>

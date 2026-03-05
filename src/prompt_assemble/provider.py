@@ -36,11 +36,11 @@ class PromptProvider:
         return self.source.get_raw(name)
 
     def render(
-        self,
-        name: str,
-        variables: Optional[Dict[str, Any]] = None,
-        recursive: bool = True,
-        max_depth: int = 10,
+            self,
+            name: str,
+            variables: Optional[Dict[str, Any]] = None,
+            recursive: bool = True,
+            max_depth: int = 10,
     ) -> str:
         """
         Load and render a prompt with variable substitution.

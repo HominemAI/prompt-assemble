@@ -2,27 +2,27 @@
 #! Tagged as case_study and practical_example for tag-based injection
 
 <case_study>
-  <title>Natural Language Processing in Survey Data Analysis</title>
+<title>Natural Language Processing in Survey Data Analysis</title>
 
-  <context>
-  A psychology research group used AI to analyze open-ended survey responses from 50,000 participants about workplace stress. Manual coding would have taken 6 researchers a full year.
-  </context>
+<context>
+A psychology research group used AI to analyze open-ended survey responses from 50, 000 participants about workplace stress. Manual coding would have taken 6 researchers a full year.
+</context>
 
-  <results>
-  - Thematic analysis completed in 3 weeks (vs estimated 52 weeks manual)
-  - Inter-rater reliability: improved from 0.72 to 0.89 with AI + human review
-  - Identified 247 distinct themes (vs ~80 with traditional methods)
-  - Cost reduction: 94% savings on analysis labor
-  </results>
+<results>
+- Thematic analysis completed in 3 weeks (vs estimated 52 weeks manual)
+- Inter-rater reliability: improved from 0.72 to 0.89 with AI + human review
+- Identified 247 distinct themes (vs ~80 with traditional methods)
+- Cost reduction: 94% savings on analysis labor
+</results>
 
-  <methodology>
-  1. AI preprocessing: cleaned and categorized responses
-  2. Thematic extraction: identified common themes and sentiment
-  3. Human validation: researchers reviewed and refined categories
-  4. Subgroup analysis: AI performed demographic breakdowns
-  </methodology>
+<methodology>
+1. AI preprocessing: cleaned and categorized responses
+2. Thematic extraction: identified common themes and sentiment
+3. Human validation: researchers reviewed and refined categories
+4. Subgroup analysis: AI performed demographic breakdowns
+</methodology>
 
-  <findings>
-  Discovered nuanced distinctions in stress factors across different organizational types, which would have been lost in purely manual analysis due to scale limitations.
-  </findings>
+<findings>
+Discovered nuanced distinctions in stress factors across different organizational types, which would have been lost in purely manual analysis due to scale limitations.
+</findings>
 </case_study>

@@ -7,11 +7,13 @@ Different deployments require different configurations. This guide shows you how
 ## Build Options
 
 ### 1. **Local Deployment (Client-Side Only)**
+
 ```bash
 npm run build:local
 ```
 
 **What it includes:**
+
 - ✅ **LocalBackend (IndexedDB)** - Browser storage
 - ✅ **FileSystemBackend (File System Access API)** - Disk files
 - ❌ RemoteBackend (HTTP API) - Not available
@@ -19,6 +21,7 @@ npm run build:local
 - **No server required**
 
 **Best for:**
+
 - ✅ Cloudflare Pages
 - ✅ Netlify / Vercel
 - ✅ GitHub Pages
@@ -27,12 +30,14 @@ npm run build:local
 - ✅ Complete control over data
 
 **Deployment:**
+
 ```bash
 npm run build:local
 # Deploy dist/ to CF Pages, Netlify, GitHub Pages, etc.
 ```
 
 **User Experience:**
+
 - Defaults to LocalBackend (IndexedDB)
 - Can switch to FileSystemBackend via Settings
 - Works completely offline
@@ -41,11 +46,13 @@ npm run build:local
 ---
 
 ### 2. **Full-Featured Deployment (With Flask API)**
+
 ```bash
 npm run build:full
 ```
 
 **What it includes:**
+
 - ✅ **LocalBackend (IndexedDB)** - Browser storage
 - ✅ **FileSystemBackend (File System Access API)** - Disk files
 - ✅ **RemoteBackend (HTTP/Flask API)** - Central server
@@ -53,6 +60,7 @@ npm run build:full
 - **Flask server required**
 
 **Best for:**
+
 - ✅ Self-hosted deployments
 - ✅ Private servers
 - ✅ Team collaboration
@@ -61,6 +69,7 @@ npm run build:full
 - ✅ When you control the server
 
 **Deployment:**
+
 ```bash
 # 1. Build the UI
 npm run build:full
@@ -73,6 +82,7 @@ python -m prompt_assemble.api.server
 ```
 
 **User Experience:**
+
 - Defaults to RemoteBackend (central API)
 - Can switch to LocalBackend (offline) or FileSystemBackend (disk)
 - All data sync'd to central server
@@ -82,19 +92,19 @@ python -m prompt_assemble.api.server
 
 ## Comparison Table
 
-| Feature | **Local** (CF Pages) | **Full** (Flask) |
-|---------|----------------------|-----------------|
-| **LocalBackend** | ✅ Yes | ✅ Yes |
-| **FileSystemBackend** | ✅ Yes | ✅ Yes |
-| **RemoteBackend** | ❌ No | ✅ Yes |
-| **Backend Switching** | ✅ Local ↔ Filesystem | ✅ All 3 |
-| **Server Required** | ❌ No | ✅ Flask |
-| **Offline Capable** | ✅ Full | ✅ Partial (Local mode) |
-| **Data Control** | User device | User device + Server |
-| **Multi-Device Sync** | ❌ Manual (cloud sync folder) | ✅ Automatic |
-| **Hosting** | Any static host | Self-hosted |
-| **Cost** | Free (CF Pages) | Server cost |
-| **Setup Complexity** | 🟢 Simple | 🟡 Moderate |
+| Feature               | **Local** (CF Pages)         | **Full** (Flask)       |
+|-----------------------|------------------------------|------------------------|
+| **LocalBackend**      | ✅ Yes                        | ✅ Yes                  |
+| **FileSystemBackend** | ✅ Yes                        | ✅ Yes                  |
+| **RemoteBackend**     | ❌ No                         | ✅ Yes                  |
+| **Backend Switching** | ✅ Local ↔ Filesystem         | ✅ All 3                |
+| **Server Required**   | ❌ No                         | ✅ Flask                |
+| **Offline Capable**   | ✅ Full                       | ✅ Partial (Local mode) |
+| **Data Control**      | User device                  | User device + Server   |
+| **Multi-Device Sync** | ❌ Manual (cloud sync folder) | ✅ Automatic            |
+| **Hosting**           | Any static host              | Self-hosted            |
+| **Cost**              | Free (CF Pages)              | Server cost            |
+| **Setup Complexity**  | 🟢 Simple                    | 🟡 Moderate            |
 
 ---
 
@@ -188,31 +198,35 @@ const defaultMode = (window as any).REACT_APP_DEFAULT_BACKEND_MODE
 
 ### Available Variables
 
-| Variable | Purpose | Example |
-|----------|---------|---------|
-| `REACT_APP_LOCKED_BACKEND_MODE` | Lock to single backend | `local`, `filesystem` |
-| `REACT_APP_DEFAULT_BACKEND_MODE` | Default if not locked | `local`, `filesystem`, `remote` |
+| Variable                         | Purpose                | Example                         |
+|----------------------------------|------------------------|---------------------------------|
+| `REACT_APP_LOCKED_BACKEND_MODE`  | Lock to single backend | `local`, `filesystem`           |
+| `REACT_APP_DEFAULT_BACKEND_MODE` | Default if not locked  | `local`, `filesystem`, `remote` |
 
 ### Setting Variables
 
 **On macOS/Linux:**
+
 ```bash
 REACT_APP_LOCKED_BACKEND_MODE=local npm run build
 ```
 
 **On Windows (PowerShell):**
+
 ```powershell
 $env:REACT_APP_LOCKED_BACKEND_MODE="local"
 npm run build
 ```
 
 **On Windows (Command Prompt):**
+
 ```cmd
 set REACT_APP_LOCKED_BACKEND_MODE=local
 npm run build
 ```
 
 **In package.json scripts:**
+
 ```json
 {
   "scripts": {
@@ -230,6 +244,7 @@ npm run build
 **Expected behavior:** The app is deployed with a locked backend mode.
 
 **To unlock:**
+
 1. Build with `npm run build:full` instead
 2. Or select a different build command
 
@@ -238,6 +253,7 @@ npm run build
 **Cause:** No Flask API server running
 
 **Solution:**
+
 1. If you deployed to CF Pages, use `build:local` instead
 2. If you need RemoteBackend, run Flask server:
    ```bash
@@ -250,6 +266,7 @@ npm run build
 **Cause:** Browser doesn't support File System Access API
 
 **Solution:**
+
 - Use Chrome/Edge (v86+), Safari (15.2+)
 - Or use LocalBackend instead
 
@@ -258,6 +275,7 @@ npm run build
 **Note:** 6.2 MB build is expected (includes jszip for export functionality)
 
 **To optimize:**
+
 - Use dynamic imports for heavy libraries
 - Tree-shake unused dependencies
 - Consider code-splitting
@@ -286,14 +304,14 @@ npm run preview
 ## Best Practices
 
 1. **For CF Pages/Netlify:** Use `build:local`
-   - Users get LocalBackend + FileSystemBackend
-   - No server maintenance needed
-   - Cheap/free hosting
+    - Users get LocalBackend + FileSystemBackend
+    - No server maintenance needed
+    - Cheap/free hosting
 
 2. **For Team/Self-Hosted:** Use `build:full`
-   - Users get all 3 backends
-   - Central repository via RemoteBackend
-   - More features
+    - Users get all 3 backends
+    - Central repository via RemoteBackend
+    - More features
 
 3. **Version Your Builds:**
    ```bash

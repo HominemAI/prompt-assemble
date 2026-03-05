@@ -30,21 +30,25 @@ pytest tests/ -v
 ## Code Quality
 
 Format code with black:
+
 ```bash
 black src/prompt_assemble tests
 ```
 
 Sort imports with isort:
+
 ```bash
 isort src/prompt_assemble tests
 ```
 
 Lint with flake8:
+
 ```bash
 flake8 src/prompt_assemble tests
 ```
 
 Type check with mypy:
+
 ```bash
 mypy src/prompt_assemble
 ```
@@ -73,6 +77,7 @@ mypy src/prompt_assemble
 ## Reporting Issues
 
 Please use GitHub Issues to report bugs or suggest features. Include:
+
 - Clear description of the issue
 - Steps to reproduce (for bugs)
 - Expected vs actual behavior

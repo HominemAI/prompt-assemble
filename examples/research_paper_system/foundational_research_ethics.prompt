@@ -2,32 +2,32 @@
 #! Tagged as reference and foundational for tag-based injection
 
 <foundational_concept>
-  <topic>Research Ethics and IRB Requirements</topic>
+<topic>Research Ethics and IRB Requirements</topic>
 
-  <definition>
-  Research ethics involves principles and standards that govern the conduct of research to protect human subjects, ensure data integrity, and maintain academic integrity. Institutional Review Boards (IRBs) provide ethical oversight.
-  </definition>
+<definition>
+Research ethics involves principles and standards that govern the conduct of research to protect human subjects, ensure data integrity, and maintain academic integrity. Institutional Review Boards (IRBs) provide ethical oversight.
+</definition>
 
-  <core_principles>
-  1. Respect for Persons: Recognize autonomy and protect vulnerable populations
-  2. Beneficence: Maximize benefits and minimize harm
-  3. Justice: Fair and equitable treatment and distribution of research benefits
-  4. Informed Consent: Participants must understand research procedures and risks
-  5. Confidentiality: Protect participant privacy and data
-  </core_principles>
+<core_principles>
+1. Respect for Persons: Recognize autonomy and protect vulnerable populations
+2. Beneficence: Maximize benefits and minimize harm
+3. Justice: Fair and equitable treatment and distribution of research benefits
+4. Informed Consent: Participants must understand research procedures and risks
+5. Confidentiality: Protect participant privacy and data
+</core_principles>
 
-  <irb_requirements>
-  - Risk Assessment: Classify research as minimal, low, or high risk
-  - Informed Consent Forms: Written documentation of participant understanding
-  - Data Security: Protocols for storing and protecting sensitive information
-  - Conflict of Interest: Disclosure of financial or personal interests
-  - Adverse Event Reporting: Procedures for reporting unexpected harmful effects
-  </irb_requirements>
+<irb_requirements>
+- Risk Assessment: Classify research as minimal, low, or high risk
+- Informed Consent Forms: Written documentation of participant understanding
+- Data Security: Protocols for storing and protecting sensitive information
+- Conflict of Interest: Disclosure of financial or personal interests
+- Adverse Event Reporting: Procedures for reporting unexpected harmful effects
+</irb_requirements>
 
-  <special_considerations>
-  - Research involving vulnerable populations requires enhanced protections
-  - International research must comply with local ethical standards
-  - AI and algorithmic research raises new ethical questions about bias and transparency
-  - Big data research requires careful handling of privacy concerns
-  </special_considerations>
+<special_considerations>
+- Research involving vulnerable populations requires enhanced protections
+- International research must comply with local ethical standards
+- AI and algorithmic research raises new ethical questions about bias and transparency
+- Big data research requires careful handling of privacy concerns
+</special_considerations>
 </foundational_concept>

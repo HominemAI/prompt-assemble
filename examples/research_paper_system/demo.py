@@ -27,17 +27,17 @@ def main():
     provider = PromptProvider(source)
 
     # List all available prompts
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("AVAILABLE PROMPTS")
-    print("="*60)
+    print("=" * 60)
     all_prompts = provider.list()
     for i, prompt_name in enumerate(sorted(all_prompts), 1):
         print(f"{i:2d}. {prompt_name}")
 
     # Find by tags
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("PROMPTS BY TAGS")
-    print("="*60)
+    print("=" * 60)
 
     templates = provider.find_by_tag("template")
     print(f"\nPrompts tagged 'template' ({len(templates)}):")
@@ -55,9 +55,9 @@ def main():
         print(f"  - {name}")
 
     # Example variables for rendering
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("RENDERING EXAMPLE")
-    print("="*60)
+    print("=" * 60)
 
     variables = {
         # Main paper variables
@@ -130,16 +130,16 @@ def main():
         # Render the main paper generator
         result = provider.render("research_paper_generator", variables=variables)
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("RENDERED OUTPUT (first 2000 chars)")
-        print("="*60)
+        print("=" * 60)
         print(result[:2000])
         if len(result) > 2000:
             print(f"\n... ({len(result) - 2000} more characters)")
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print(f"RENDER COMPLETE - Total output length: {len(result)} characters")
-        print("="*60)
+        print("=" * 60)
 
     except Exception as e:
         print(f"\nError during rendering: {e}")

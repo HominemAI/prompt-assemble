@@ -2,7 +2,8 @@
 
 ## Overview
 
-The prompt-assemble web app now supports **runtime backend switching**. Users can seamlessly switch between three storage modes without losing data:
+The prompt-assemble web app now supports **runtime backend switching**. Users can seamlessly switch between three
+storage modes without losing data:
 
 - **🌐 Browser Only** (IndexedDB) - Default, offline-capable, device-isolated
 - **📁 Filesystem** (File System Access API) - Disk-based, editable in code editors, version-controllable
@@ -20,13 +21,13 @@ The prompt-assemble web app now supports **runtime backend switching**. Users ca
 When you click "Filesystem Storage":
 
 1. **Import Decision**: Choose whether to import current browser data
-   - ✓ Import browser data → Migrate all prompts, versions, variable sets, and subscriptions
-   - ✗ Start fresh → Keep browser data; filesystem starts empty
+    - ✓ Import browser data → Migrate all prompts, versions, variable sets, and subscriptions
+    - ✗ Start fresh → Keep browser data; filesystem starts empty
 
 2. **Folder Selection**: Click "Continue" to select a folder
-   - Browser shows directory picker (OS native)
-   - Choose an existing folder or create a new one
-   - Preview shows file count and formats (.prompt, .txt files)
+    - Browser shows directory picker (OS native)
+    - Choose an existing folder or create a new one
+    - Preview shows file count and formats (.prompt, .txt files)
 
 3. **Verification**: Confirm the folder will be used
    ```
@@ -51,12 +52,14 @@ When you click "Browser Only":
 ### Data Persistence
 
 **Browser Storage (IndexedDB):**
+
 - ✅ Persists across browser restarts
 - ✅ Survives power outages
 - ✓ Stored in browser's local storage (device-specific)
 - ✓ ~100MB+ capacity (browser-dependent)
 
 **Filesystem Storage:**
+
 - ✅ Persists on disk in selected folder
 - ✅ Survives all shutdowns
 - ✓ Human-readable .prompt files
@@ -88,6 +91,7 @@ my-prompts/
 ```
 
 **Important:**
+
 - Only `.prompt` and `.txt` files are treated as prompts
 - `_registry.json`, `_versions.json`, and `.prompt-assemble/` are managed by the app
 - Don't manually edit these files — use the app UI only
@@ -99,25 +103,26 @@ When switching backends with data import enabled:
 ### What Gets Migrated
 
 1. **Prompts**
-   - Content of each prompt
-   - Metadata (description, tags, owner)
-   - Revision comments
+    - Content of each prompt
+    - Metadata (description, tags, owner)
+    - Revision comments
 
 2. **Version History**
-   - All previous versions are backed up
-   - Timestamps and revision comments preserved
+    - All previous versions are backed up
+    - Timestamps and revision comments preserved
 
 3. **Variable Sets**
-   - Each variable set is recreated
-   - Variable values are preserved
+    - Each variable set is recreated
+    - Variable values are preserved
 
 4. **Subscriptions**
-   - Which prompts are subscribed to which variable sets
-   - Per-set overrides are preserved
+    - Which prompts are subscribed to which variable sets
+    - Per-set overrides are preserved
 
 ### Migration Log
 
 During migration, the app logs progress:
+
 ```
 [Migration] Starting data migration...
 [Migration] Loading prompts from source backend...
@@ -189,17 +194,19 @@ export PROMPT_ASSEMBLE_BACKEND=local  # or: remote, filesystem
 **Cause:** Browser doesn't have permission to access the folder
 
 **Solution:**
+
 1. Click "Continue" again
 2. When permission dialog appears, click "Allow" or "Grant access"
 3. If already denied, reset permissions in browser settings:
-   - Chrome: Settings → Privacy → Site settings → File system access
-   - Firefox: Not yet supported (tracked as feature request)
+    - Chrome: Settings → Privacy → Site settings → File system access
+    - Firefox: Not yet supported (tracked as feature request)
 
 ### "Folder structure unrecognized" error
 
 **Cause:** Selected an incompatible folder
 
 **Solution:**
+
 1. Create a new empty folder
 2. Switch to filesystem backend
 3. App will initialize the folder with proper structure
@@ -209,6 +216,7 @@ export PROMPT_ASSEMBLE_BACKEND=local  # or: remote, filesystem
 **Cause:** Migration failed silently
 
 **Solution:**
+
 1. Check browser console (F12 → Console tab) for errors
 2. If migration failed, switch back to previous backend
 3. Try again, ensuring all data is selected for import
@@ -218,6 +226,7 @@ export PROMPT_ASSEMBLE_BACKEND=local  # or: remote, filesystem
 **Cause:** Browser storage (IndexedDB) was cleared
 
 **Solution:**
+
 1. IndexedDB data was lost (browser clear cache, etc.)
 2. Switch to filesystem backend instead
 3. Browser storage cannot be recovered once cleared
@@ -260,6 +269,7 @@ await handle.queryPermission({ mode: 'readwrite' })
 ```
 
 This allows the app to:
+
 1. Remember which folder was selected
 2. Request permission automatically on next load
 3. Seamlessly restore the connection
@@ -268,10 +278,10 @@ This allows the app to:
 
 | Browser | IndexedDB | File System Access API |
 |---------|-----------|------------------------|
-| Chrome  | ✅ Full   | ✅ v86+               |
-| Firefox | ✅ Full   | ❌ Not yet            |
-| Safari  | ✅ Full   | ⚠️ Limited (15.2+)   |
-| Edge    | ✅ Full   | ✅ v86+               |
+| Chrome  | ✅ Full    | ✅ v86+                 |
+| Firefox | ✅ Full    | ❌ Not yet              |
+| Safari  | ✅ Full    | ⚠️ Limited (15.2+)     |
+| Edge    | ✅ Full    | ✅ v86+                 |
 
 **Note:** If File System Access API is unavailable, filesystem backend will show a warning message.
 
@@ -296,19 +306,23 @@ This allows the app to:
 ## FAQ
 
 **Q: Can I edit .prompt files in VS Code while the app is running?**
-A: No. The app reads and writes files; external edits may be overwritten. Close the app before manual edits, or use the app UI only.
+A: No. The app reads and writes files; external edits may be overwritten. Close the app before manual edits, or use the
+app UI only.
 
 **Q: Will switching backends lose my data?**
-A: No. If you enable "Import browser data", all data is migrated. If you disable it, old data remains on your device and can be recovered by switching back.
+A: No. If you enable "Import browser data", all data is migrated. If you disable it, old data remains on your device and
+can be recovered by switching back.
 
 **Q: Can I use the same folder on multiple computers?**
-A: Yes, if the folder is synced (Dropbox, Google Drive, etc.). The first app instance to write will save its changes; subsequent instances should refresh to see changes.
+A: Yes, if the folder is synced (Dropbox, Google Drive, etc.). The first app instance to write will save its changes;
+subsequent instances should refresh to see changes.
 
 **Q: What if I delete files from the filesystem folder?**
 A: The app treats the folder as source-of-truth. Deleted files are gone. Keep backups if important.
 
 **Q: Can I have multiple folder locations?**
-A: Currently, the app stores one filesystem location. You can switch folders manually by going back to Browser storage and selecting a different folder later.
+A: Currently, the app stores one filesystem location. You can switch folders manually by going back to Browser storage
+and selecting a different folder later.
 
 ---
 

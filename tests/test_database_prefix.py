@@ -11,6 +11,7 @@ import pytest
 
 from prompt_assemble.sources import DatabaseSource
 
+
 @pytest.mark.skip(reason="Requires PostgreSQL (not supported with SQLite)")
 @pytest.mark.skip(reason="Requires PostgreSQL (not supported with SQLite)")
 def test_table_prefix_from_env():

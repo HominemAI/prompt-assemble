@@ -1,8 +1,6 @@
 #! Validation Checklist - Used by methodology_template
 
-Validation Checklist for [[SUBJECT_AREA]]:
-
-☐ [[VALIDITY_CHECK_1]]
+Validation Checklist for [[SUBJECT_AREA]]: ☐ [[VALIDITY_CHECK_1]]
 ☐ [[VALIDITY_CHECK_2]]
 ☐ [[VALIDITY_CHECK_3]]
 ☐ Reviewed by: [[REVIEW_AUTHORITY]]

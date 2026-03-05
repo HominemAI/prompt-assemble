@@ -1,72 +1,151 @@
 {
   "research_paper_generator": {
     "description": "Main research paper generator that orchestrates all sections through nested prompts and tag-based injection",
-    "tags": ["template", "main", "research", "academic", "paper"],
+    "tags": [
+      "template",
+      "main",
+      "research",
+      "academic",
+      "paper"
+    ],
     "owner": "research-team"
   },
   "abstract_template": {
     "description": "Reusable abstract template used by research_paper_generator. Contains variable placeholders for subject, focus, and key findings.",
-    "tags": ["template", "academic", "introduction", "abstract"],
+    "tags": [
+      "template",
+      "academic",
+      "introduction",
+      "abstract"
+    ],
     "owner": "research-team"
   },
   "research_instructions": {
     "description": "Guidelines for conducting research in the specified domain. Covers structure, methodology, and quality standards.",
-    "tags": ["template", "academic", "methods", "guidelines"],
+    "tags": [
+      "template",
+      "academic",
+      "methods",
+      "guidelines"
+    ],
     "owner": "research-team"
   },
   "methodology_template": {
     "description": "Detailed methodology section template covering research design, participants, data collection, and analysis methods.",
-    "tags": ["template", "methods", "academic", "detailed"],
+    "tags": [
+      "template",
+      "methods",
+      "academic",
+      "detailed"
+    ],
     "owner": "research-team"
   },
   "validation_checklist": {
     "description": "Validation checklist for research methodology. Ensures all quality and validation criteria are met before submission.",
-    "tags": ["template", "validation", "checklist", "quality"],
+    "tags": [
+      "template",
+      "validation",
+      "checklist",
+      "quality"
+    ],
     "owner": "research-team"
   },
   "reference_guidelines": {
     "description": "Guidelines for formatting references and citations. Includes citation style requirements and authority level standards.",
-    "tags": ["template", "academic", "references", "citations"],
+    "tags": [
+      "template",
+      "academic",
+      "references",
+      "citations"
+    ],
     "owner": "research-team"
   },
   "example_ai_research": {
     "description": "Real-world case study of AI integration in computer science research. Demonstrates 50% time reduction and improved hypothesis quality.",
-    "tags": ["case_study", "practical_example", "ai", "computer_science", "success_story"],
+    "tags": [
+      "case_study",
+      "practical_example",
+      "ai",
+      "computer_science",
+      "success_story"
+    ],
     "owner": "research-team"
   },
   "example_biomedical_study": {
     "description": "Case study of AI-enhanced drug discovery. Shows AI acceleration in protein prediction and drug candidate screening.",
-    "tags": ["case_study", "practical_example", "biomedical", "health", "drug_discovery"],
+    "tags": [
+      "case_study",
+      "practical_example",
+      "biomedical",
+      "health",
+      "drug_discovery"
+    ],
     "owner": "research-team"
   },
   "example_social_science": {
     "description": "Case study of NLP in social science research. Demonstrates how AI analyzed 50,000 survey responses in 3 weeks.",
-    "tags": ["case_study", "practical_example", "social_science", "psychology", "nlp"],
+    "tags": [
+      "case_study",
+      "practical_example",
+      "social_science",
+      "psychology",
+      "nlp"
+    ],
     "owner": "research-team"
   },
   "foundational_machine_learning": {
     "description": "Foundational concepts in supervised machine learning. Covers key principles, algorithms, and research applications.",
-    "tags": ["reference", "foundational", "machine_learning", "ai", "supervised_learning"],
+    "tags": [
+      "reference",
+      "foundational",
+      "machine_learning",
+      "ai",
+      "supervised_learning"
+    ],
     "owner": "research-team"
   },
   "foundational_statistics": {
     "description": "Foundational statistical hypothesis testing concepts. Covers p-values, significance levels, common tests, and research importance.",
-    "tags": ["reference", "foundational", "statistics", "methodology", "hypothesis_testing"],
+    "tags": [
+      "reference",
+      "foundational",
+      "statistics",
+      "methodology",
+      "hypothesis_testing"
+    ],
     "owner": "research-team"
   },
   "foundational_research_ethics": {
     "description": "Research ethics and IRB requirements. Covers core principles, IRB procedures, and special considerations for different research types.",
-    "tags": ["reference", "foundational", "ethics", "irb", "research_integrity"],
+    "tags": [
+      "reference",
+      "foundational",
+      "ethics",
+      "irb",
+      "research_integrity"
+    ],
     "owner": "research-team"
   },
   "example_citation_ml": {
     "description": "Example citations in machine learning field. Shows proper APA 7th edition formatting with DOI links.",
-    "tags": ["reference", "example", "citations", "machine_learning", "apa"],
+    "tags": [
+      "reference",
+      "example",
+      "citations",
+      "machine_learning",
+      "apa"
+    ],
     "owner": "research-team"
   },
   "example_citation_statistics": {
     "description": "Example citations in statistics field. Covers foundational statistical texts and guidelines for usage.",
-    "tags": ["reference", "example", "citations", "statistics", "apa"],
+    "tags": [
+      "reference",
+      "example",
+      "citations",
+      "statistics",
+      "apa"
+    ],
     "owner": "research-team"
   }
 }

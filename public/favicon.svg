@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <!-- <P> text in blue, transparent background -->
-  <text x="50" y="65" font-family="monospace" font-size="56" font-weight="bold" fill="#1e3a5f" text-anchor="middle" dominant-baseline="middle">&lt;P&gt;</text>
+    <!-- <P> text in blue, transparent background -->
+    <text x="50" y="65" font-family="monospace" font-size="56" font-weight="bold" fill="#1e3a5f" text-anchor="middle"
+          dominant-baseline="middle">&lt;P&gt;
+    </text>
 </svg>

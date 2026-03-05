@@ -2,60 +2,60 @@
 #! This prompt demonstrates variable hierarchy, nested prompts, and tag-based injection
 
 <paper>
-  <metadata>
-    <title>[[PAPER_TITLE]]</title>
-    <author>[[AUTHOR_NAME]]</author>
-    <date>[[PUBLICATION_DATE]]</date>
-    <institution>[[INSTITUTION]]</institution>
-  </metadata>
+<metadata>
+<title>[[PAPER_TITLE]]</title>
+<author>[[AUTHOR_NAME]]</author>
+<date>[[PUBLICATION_DATE]]</date>
+<institution>[[INSTITUTION]]</institution>
+</metadata>
 
-  <abstract>
+<abstract>
 [[PROMPT: abstract_template]]
-  </abstract>
+</abstract>
 
-  <introduction>
-    <context>[[CONTEXT_BACKGROUND]]</context>
-    <problem_statement>[[PROBLEM_STATEMENT]]</problem_statement>
-    <thesis>[[THESIS_STATEMENT]]</thesis>
-    <instructions>
+<introduction>
+<context>[[CONTEXT_BACKGROUND]]</context>
+<problem_statement>[[PROBLEM_STATEMENT]]</problem_statement>
+<thesis>[[THESIS_STATEMENT]]</thesis>
+<instructions>
 [[PROMPT: research_instructions]]
-    </instructions>
-  </introduction>
+</instructions>
+</introduction>
 
-  <literature_review>
-    <title>Literature Review: [[SUBJECT_AREA]]</title>
-    <approach>[[LITERATURE_APPROACH]]</approach>
-    <key_concepts>
+<literature_review>
+<title>Literature Review: [[SUBJECT_AREA]]</title>
+<approach>[[LITERATURE_APPROACH]]</approach>
+<key_concepts>
 [[PROMPT_TAG: reference, foundational]]
-    </key_concepts>
-  </literature_review>
+</key_concepts>
+</literature_review>
 
-  <methodology>
+<methodology>
 [[PROMPT: methodology_template]]
-  </methodology>
+</methodology>
 
-  <results>
-    <domain>[[RESEARCH_DOMAIN]]</domain>
-    <metrics>[[SUCCESS_METRICS]]</metrics>
-    <results_approach>[[RESULTS_PRESENTATION_STYLE]]</results_approach>
-  </results>
+<results>
+<domain>[[RESEARCH_DOMAIN]]</domain>
+<metrics>[[SUCCESS_METRICS]]</metrics>
+<results_approach>[[RESULTS_PRESENTATION_STYLE]]</results_approach>
+</results>
 
-  <discussion>
-    <findings_summary>[[FINDINGS_SUMMARY]]</findings_summary>
-    <implications>[[IMPLICATIONS_FOR_FIELD]]</implications>
-    <limitations>[[STUDY_LIMITATIONS]]</limitations>
-    <examples>
+<discussion>
+<findings_summary>[[FINDINGS_SUMMARY]]</findings_summary>
+<implications>[[IMPLICATIONS_FOR_FIELD]]</implications>
+<limitations>[[STUDY_LIMITATIONS]]</limitations>
+<examples>
 [[PROMPT_TAG: 3: case_study, practical_example]]
-    </examples>
-  </discussion>
+</examples>
+</discussion>
 
-  <conclusion>
-    <restatement>[[THESIS_RESTATEMENT]]</restatement>
-    <future_work>[[FUTURE_RESEARCH_DIRECTIONS]]</future_work>
-    <closing>[[CLOSING_THOUGHT]]</closing>
-  </conclusion>
+<conclusion>
+<restatement>[[THESIS_RESTATEMENT]]</restatement>
+<future_work>[[FUTURE_RESEARCH_DIRECTIONS]]</future_work>
+<closing>[[CLOSING_THOUGHT]]</closing>
+</conclusion>
 
-  <references>
+<references>
 [[PROMPT: reference_guidelines]]
-  </references>
+</references>
 </paper>

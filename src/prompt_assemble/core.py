@@ -14,7 +14,6 @@ from typing import Any, Callable, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-
 TagResolver = Callable[[list[str]], list[str]]  # tags -> prompt names
 
 
@@ -71,13 +70,13 @@ def _strip_comments(text: str) -> str:
 
 
 def substitute(
-    text: str,
-    variables: Optional[Dict[str, Any]] = None,
-    components: Optional[Dict[str, str]] = None,
-    recursive: bool = True,
-    max_depth: int = 10,
-    component_resolver: Optional[Callable[[str], str]] = None,
-    tag_resolver: Optional[TagResolver] = None,
+        text: str,
+        variables: Optional[Dict[str, Any]] = None,
+        components: Optional[Dict[str, str]] = None,
+        recursive: bool = True,
+        max_depth: int = 10,
+        component_resolver: Optional[Callable[[str], str]] = None,
+        tag_resolver: Optional[TagResolver] = None,
 ) -> str:
     """
     Perform sigil-based substitution on text.
@@ -195,10 +194,10 @@ def substitute(
 
 
 def assemble(
-    template: str,
-    variables: Optional[Dict[str, Any]] = None,
-    components: Optional[Dict[str, str]] = None,
-    output_format: str = "text",
+        template: str,
+        variables: Optional[Dict[str, Any]] = None,
+        components: Optional[Dict[str, str]] = None,
+        output_format: str = "text",
 ) -> Any:
     """
     Assemble a prompt from a template and substitutions.

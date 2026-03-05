@@ -3,7 +3,7 @@ name: Build and Push Docker Image
 on:
   push:
     # Publish version tags as releases
-    tags: ['v*.*.*']
+    tags: [ 'v*.*.*' ]
 
 env:
   # Use ghcr.io for GitHub Container Registry

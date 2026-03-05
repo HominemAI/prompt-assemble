@@ -27,26 +27,27 @@ psql -h localhost -U postgres -d prompts -f load_to_postgres.sql
 
 ### Prompts (14 total)
 
-| Prompt | Type | Purpose |
-|--------|------|---------|
-| `research_paper_generator` | Orchestrator | Main entry point coordinating all sections |
-| `abstract_template` | Template | Reusable abstract section |
-| `research_instructions` | Template | Research methodology guidelines |
-| `methodology_template` | Template | Detailed methodology structure |
-| `validation_checklist` | Template | Quality validation checklist |
-| `reference_guidelines` | Template | Citation and reference standards |
-| `example_ai_research` | Case Study | AI in computer science research |
-| `example_biomedical_study` | Case Study | AI in drug discovery |
-| `example_social_science` | Case Study | NLP in social science research |
-| `foundational_machine_learning` | Reference | ML concepts and principles |
-| `foundational_statistics` | Reference | Statistical hypothesis testing |
-| `foundational_research_ethics` | Reference | Research ethics and IRB |
-| `example_citation_ml` | Example | ML citation examples |
-| `example_citation_statistics` | Example | Statistics citation examples |
+| Prompt                          | Type         | Purpose                                    |
+|---------------------------------|--------------|--------------------------------------------|
+| `research_paper_generator`      | Orchestrator | Main entry point coordinating all sections |
+| `abstract_template`             | Template     | Reusable abstract section                  |
+| `research_instructions`         | Template     | Research methodology guidelines            |
+| `methodology_template`          | Template     | Detailed methodology structure             |
+| `validation_checklist`          | Template     | Quality validation checklist               |
+| `reference_guidelines`          | Template     | Citation and reference standards           |
+| `example_ai_research`           | Case Study   | AI in computer science research            |
+| `example_biomedical_study`      | Case Study   | AI in drug discovery                       |
+| `example_social_science`        | Case Study   | NLP in social science research             |
+| `foundational_machine_learning` | Reference    | ML concepts and principles                 |
+| `foundational_statistics`       | Reference    | Statistical hypothesis testing             |
+| `foundational_research_ethics`  | Reference    | Research ethics and IRB                    |
+| `example_citation_ml`           | Example      | ML citation examples                       |
+| `example_citation_statistics`   | Example      | Statistics citation examples               |
 
 ### Tags (63 total across prompts)
 
 Organized by category:
+
 - **Template tags**: template, academic, methods
 - **Case study tags**: case_study, practical_example
 - **Reference tags**: reference, foundational
@@ -55,22 +56,22 @@ Organized by category:
 ### Variable Sets (6 total)
 
 1. **General Research Settings** (14 variables)
-   - Paper metadata, subject area, problem statement, thesis, etc.
+    - Paper metadata, subject area, problem statement, thesis, etc.
 
 2. **Academic Style - PhD Level** (14 variables)
-   - Methodology details, audience level, research design, tools, etc.
+    - Methodology details, audience level, research design, tools, etc.
 
 3. **Validation Framework** (5 variables)
-   - Validity checks, review authority, validation method
+    - Validity checks, review authority, validation method
 
 4. **Citation & References** (5 variables)
-   - Citation style, minimum references, recency standards, authority levels
+    - Citation style, minimum references, recency standards, authority levels
 
 5. **Success Metrics** (3 variables)
-   - Metrics, findings summary, field implications
+    - Metrics, findings summary, field implications
 
 6. **Results Presentation** (1 variable)
-   - Results presentation style
+    - Results presentation style
 
 **Total: 47 variables**
 
@@ -185,6 +186,7 @@ python -m prompt_assemble.api.server
 ```
 
 In the UI:
+
 1. Prompts automatically appear in the explorer
 2. Tags enable filtering and searching
 3. Variable sets can be created and subscribed to documents
@@ -194,18 +196,24 @@ In the UI:
 The `load_to_postgres.sql` script has 5 sections:
 
 ### Section 1: Insert Prompts
-Loads all 14 .prompt files as records in the `prompts` table. Uses `ON CONFLICT (name) DO UPDATE` to allow re-running the script.
+
+Loads all 14 .prompt files as records in the `prompts` table. Uses `ON CONFLICT (name) DO UPDATE` to allow re-running
+the script.
 
 ### Section 2: Insert Metadata
+
 Adds descriptions and owner information to `prompt_registry` for each prompt.
 
 ### Section 3: Insert Tags
+
 Applies 63 tags across the 14 prompts using `prompt_tags` table.
 
 ### Section 4: Create Variable Sets
+
 Creates 6 named variable sets in the `variable_sets` table.
 
 ### Section 5: Populate Variables
+
 Inserts 47 variables across the 6 sets in `variable_set_variables` table.
 
 ## Verifying the Load
@@ -253,6 +261,7 @@ SELECT vs.name, COUNT(vsv.id) as variable_count
 ## Re-running the Script
 
 The script is idempotent (safe to run multiple times):
+
 - `ON CONFLICT (name) DO UPDATE` for prompts ensures old content is updated
 - `ON CONFLICT DO NOTHING` for tags and variables prevents duplicates
 
@@ -275,12 +284,14 @@ psql -h localhost -U postgres -d prompts -f load_to_postgres.sql
 ## Troubleshooting
 
 ### "FATAL: role "postgres" does not exist"
+
 ```bash
 # Use your actual PostgreSQL user
 psql -h localhost -U your_username -d prompts -f load_to_postgres.sql
 ```
 
 ### "FATAL: database "prompts" does not exist"
+
 ```bash
 # Create database first
 createdb -U postgres prompts
@@ -289,6 +300,7 @@ psql -U postgres -c "CREATE DATABASE prompts;"
 ```
 
 ### "ERROR: relation "prompts" does not exist"
+
 The schema hasn't been initialized. Initialize it first:
 
 ```python
@@ -302,7 +314,9 @@ source = DatabaseSource(conn)  # This creates the schema
 Then run the SQL script.
 
 ### "ERROR: syntax error in SQL"
+
 Make sure you're using the correct PostgreSQL version. The script uses:
+
 - `gen_random_uuid()` (PostgreSQL 9.4+)
 - `ON CONFLICT` clauses (PostgreSQL 9.5+)
 
@@ -317,6 +331,7 @@ The 6 variable sets loaded work seamlessly with the web UI's variable sets featu
 5. **Render**: Click "Render" button to generate output with merged variables
 
 Example workflow:
+
 - Document subscribes to: "General Research Settings" + "Academic Style - PhD Level"
 - Override: `AUTHOR_NAME` → "Your Name", `INSTITUTION` → "Your University"
 - Render: All variables merged and substituted into the complete paper
@@ -326,6 +341,7 @@ Example workflow:
 To modify the loaded data:
 
 ### Add New Prompt
+
 ```sql
 INSERT INTO prompts (name, content) VALUES
   ('my_new_prompt', 'Content here with [[VARIABLES]]');
@@ -340,6 +356,7 @@ INSERT INTO prompt_tags (prompt_id, tag) VALUES
 ```
 
 ### Add New Variable to Existing Set
+
 ```sql
 INSERT INTO variable_set_variables (variable_set_id, name, value) VALUES
   ((SELECT id FROM variable_sets WHERE name = 'General Research Settings'),
@@ -348,6 +365,7 @@ INSERT INTO variable_set_variables (variable_set_id, name, value) VALUES
 ```
 
 ### Create New Variable Set
+
 ```sql
 INSERT INTO variable_sets (name) VALUES ('My New Set');
 
@@ -366,6 +384,7 @@ INSERT INTO variable_set_variables (variable_set_id, name, value) VALUES
 - Tag searching uses sequential scan (acceptable for small sets)
 
 For larger deployments (100+ prompts), consider:
+
 - Creating indexes on `prompt_tags.tag`
 - Caching tag lists in application layer
 - Pagination in UI for large lists

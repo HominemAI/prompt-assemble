@@ -2,24 +2,24 @@
 #! Tagged as reference and example for tag-based injection
 
 <citation>
-  <format>APA 7th Edition</format>
+<format>APA 7th Edition</format>
 
-  <example_citations>
-  1. LeCun, Y., Bengio, Y., & Hinton, G. E. (2015). Deep learning. Nature, 521(7553), 436-444. https://doi.org/10.1038/nature14539
+<example_citations>
+1. LeCun, Y., Bengio, Y., & Hinton, G. E. (2015). Deep learning. Nature, 521(7553), 436-444. https: //doi.org/10.1038/nature14539
 
-  2. Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., ... & Polosukhin, I. (2017). Attention is all you need. Advances in Neural Information Processing Systems, 30, 5998-6008.
+2. Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., ... & Polosukhin, I. (2017). Attention is all you need. Advances in Neural Information Processing Systems, 30, 5998-6008.
 
-  3. Goodfellow, I., Bengio, Y., & Courville, A. (2016). Deep learning. MIT Press.
+3. Goodfellow, I., Bengio, Y., & Courville, A. (2016). Deep learning. MIT Press.
 
-  4. Kingma, D. P., & Ba, J. (2014). Adam: A method for stochastic optimization. arXiv preprint arXiv:1412.6980.
+4. Kingma, D. P., & Ba, J. (2014). Adam: A method for stochastic optimization. arXiv preprint arXiv: 1412.6980.
 
-  5. Rumelhart, D. E., Hinton, G. E., & Williams, R. J. (1986). Learning representations by back-propagating errors. Nature, 323(6088), 533-536.
-  </example_citations>
+5. Rumelhart, D. E., Hinton, G. E., & Williams, R. J. (1986). Learning representations by back-propagating errors. Nature, 323(6088), 533-536.
+</example_citations>
 
-  <citation_tips>
-  - Include DOI when available for maximum precision
-  - Conference papers are cited with venue (e.g., "Advances in Neural Information Processing Systems")
-  - Preprints (arXiv) are acceptable but peer-reviewed versions are preferred
-  - Ensure all author names are included for proper credit
-  </citation_tips>
+<citation_tips>
+- Include DOI when available for maximum precision
+- Conference papers are cited with venue (e.g., "Advances in Neural Information Processing Systems")
+- Preprints (arXiv) are acceptable but peer-reviewed versions are preferred
+- Ensure all author names are included for proper credit
+</citation_tips>
 </citation>
