@@ -4,8 +4,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from prompt_assemble import PromptProvider
+from prompt_assemble import PromptProvider, ReadOnlySourceError, bulk_import
 from prompt_assemble.exceptions import PromptNotFoundError
+from prompt_assemble.registry import Registry, RegistryEntry
 from prompt_assemble.sources.base import PromptSource
 
 
@@ -14,8 +15,10 @@ class MockSource(PromptSource):
 
     def __init__(self):
         """Initialize mock source with test data."""
+        super().__init__()
         self.prompts = {}
         self.tags = {}  # prompt_name -> list of tags
+        self._registry = Registry()  # For bulk_import metadata
 
     def get_raw(self, name: str) -> str:
         """Get raw prompt content."""
@@ -46,6 +49,9 @@ class MockSource(PromptSource):
         """Add a prompt to the mock source."""
         self.prompts[name] = content
         self.tags[name] = tags or []
+        # Register in registry
+        entry = RegistryEntry(name=name, tags=tags or [])
+        self._registry.register(entry)
 
 
 @pytest.fixture
@@ -352,3 +358,166 @@ class TestCrossSigilNesting:
             variables={"VALUE": "Deep value"},
         )
         assert "Deep value" in result
+
+
+class TestPromptProviderSave:
+    """Test save and delete functionality."""
+
+    def test_save_via_provider(self, provider, mock_source):
+        """Test that provider.save_prompt delegates to source."""
+        # First, add save_prompt to the mock source
+        mock_source.save_prompt = Mock()
+
+        provider.save_prompt("test", "content", description="Test")
+        mock_source.save_prompt.assert_called_once_with(
+            "test", "content", description="Test"
+        )
+
+    def test_delete_via_provider(self, provider, mock_source):
+        """Test that provider.delete_prompt delegates to source."""
+        # First, add delete_prompt to the mock source
+        mock_source.delete_prompt = Mock()
+
+        provider.delete_prompt("test")
+        mock_source.delete_prompt.assert_called_once_with("test")
+
+    def test_save_on_readonly_source_raises(self, provider):
+        """Test that save on read-only source raises ReadOnlySourceError."""
+        with pytest.raises(
+            ReadOnlySourceError, match="does not support saving"
+        ):
+            provider.save_prompt("test", "content")
+
+    def test_delete_on_readonly_source_raises(self, provider):
+        """Test that delete on read-only source raises ReadOnlySourceError."""
+        with pytest.raises(
+            ReadOnlySourceError, match="does not support deleting"
+        ):
+            provider.delete_prompt("test")
+
+
+class TestBulkImport:
+    """Test bulk import functionality."""
+
+    def test_bulk_import_all_prompts(self, mock_source):
+        """Test importing all prompts from source to target."""
+        # Set up source with prompts and metadata
+        mock_source.add_prompt("p1", "Content 1", tags=["tag1"])
+        mock_source.add_prompt("p2", "Content 2", tags=["tag2", "tag1"])
+        source_provider = PromptProvider(mock_source)
+
+        # Set up target with save capability
+        target_source = MockSource()
+        target_source.save_prompt = Mock()
+        target_provider = PromptProvider(target_source)
+
+        # Run bulk import
+        results = bulk_import(source_provider, target_provider)
+
+        # Verify results
+        assert results["imported"] == 2
+        assert results["errors"] == 0
+        assert results["skipped"] == 0
+        assert target_source.save_prompt.call_count == 2
+
+    def test_bulk_import_transfers_metadata(self, mock_source):
+        """Test that metadata (tags, description, owner) is transferred."""
+        # Add prompt with full metadata to mock source
+        mock_source.add_prompt("greeting", "Hello [[NAME]]!", tags=["hello", "greeting"])
+        # Manually set metadata in registry
+        entry = mock_source._registry.get("greeting")
+        entry.description = "Greeting prompt"
+        entry.owner = "alice"
+
+        source_provider = PromptProvider(mock_source)
+
+        # Set up target
+        target_source = MockSource()
+        target_source.save_prompt = Mock()
+        target_provider = PromptProvider(target_source)
+
+        # Run bulk import
+        bulk_import(source_provider, target_provider)
+
+        # Verify metadata was passed
+        call_args = target_source.save_prompt.call_args
+        assert call_args[0][0] == "greeting"  # name
+        assert call_args[0][1] == "Hello [[NAME]]!"  # content
+        assert call_args[1]["description"] == "Greeting prompt"
+        assert call_args[1]["owner"] == "alice"
+        assert set(call_args[1]["tags"]) == {"hello", "greeting"}
+
+    def test_bulk_import_skip_existing(self, mock_source):
+        """Test skip_existing flag prevents overwriting."""
+        mock_source.add_prompt("p1", "Original content")
+        source_provider = PromptProvider(mock_source)
+
+        # Target already has p1
+        target_source = MockSource()
+        target_source.add_prompt("p1", "Existing content")
+        target_source.save_prompt = Mock()
+        target_provider = PromptProvider(target_source)
+
+        # Import with skip_existing=True
+        results = bulk_import(
+            source_provider, target_provider, skip_existing=True
+        )
+
+        # Should skip p1
+        assert results["skipped"] == 1
+        assert results["imported"] == 0
+        target_source.save_prompt.assert_not_called()
+
+    def test_bulk_import_readonly_target_raises(self, mock_source):
+        """Test that read-only target raises ReadOnlySourceError."""
+        mock_source.add_prompt("p1", "content")
+        source_provider = PromptProvider(mock_source)
+
+        # Target is read-only (MockSource without save_prompt)
+        readonly_source = MockSource()
+        target_provider = PromptProvider(readonly_source)
+
+        with pytest.raises(
+            ReadOnlySourceError, match="does not support saving"
+        ):
+            bulk_import(source_provider, target_provider)
+
+    def test_bulk_import_handles_errors_gracefully(self, mock_source):
+        """Test that import continues despite individual errors."""
+        mock_source.add_prompt("p1", "Content 1")
+        mock_source.add_prompt("p2", "Content 2")
+        source_provider = PromptProvider(mock_source)
+
+        # Target that fails on p1 but works on p2
+        target_source = MockSource()
+        def save_with_error(name, content, **kwargs):
+            if name == "p1":
+                raise ValueError("Simulated error")
+            target_source.add_prompt(name, content, tags=kwargs.get("tags", []))
+
+        target_source.save_prompt = save_with_error
+        target_provider = PromptProvider(target_source)
+
+        # Run bulk import
+        results = bulk_import(source_provider, target_provider)
+
+        # Should report 1 imported, 1 error
+        assert results["imported"] == 1
+        assert results["errors"] == 1
+        assert len(results["errors_list"]) == 1
+        assert results["errors_list"][0]["name"] == "p1"
+        assert "Simulated error" in results["errors_list"][0]["error"]
+
+    def test_bulk_import_empty_source(self, mock_source):
+        """Test importing from empty source."""
+        source_provider = PromptProvider(mock_source)
+
+        target_source = MockSource()
+        target_source.save_prompt = Mock()
+        target_provider = PromptProvider(target_source)
+
+        results = bulk_import(source_provider, target_provider)
+
+        assert results["imported"] == 0
+        assert results["errors"] == 0
+        assert results["skipped"] == 0

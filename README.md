@@ -157,6 +157,86 @@ provider = PromptProvider(source)
 
 See [DOCKER.md](./DOCKER.md#with-database) for a complete Docker Compose setup with PostgreSQL.
 
+## Bulk Import (Preloading Database)
+
+The `bulk_import()` function allows you to migrate all prompts and their metadata from one source to another. This is useful for:
+- Populating a database with prompts stored in the filesystem
+- Migrating between storage backends
+- Backing up/restoring prompts
+
+```python
+from prompt_assemble import (
+    PromptProvider,
+    FileSystemSource,
+    DatabaseSource,
+    bulk_import
+)
+import psycopg2
+
+# Load prompts from filesystem
+filesystem_source = FileSystemSource('./prompts')
+source_provider = PromptProvider(filesystem_source)
+
+# Connect to PostgreSQL database
+conn = psycopg2.connect(
+    host="localhost",
+    database="prompts",
+    user="postgres",
+    password="secret"
+)
+database_source = DatabaseSource(conn, table_prefix="prod_")
+target_provider = PromptProvider(database_source)
+
+# Bulk import with all metadata (tags, description, owner)
+results = bulk_import(source_provider, target_provider, verbose=True)
+
+print(f"✅ Imported {results['imported']} prompts")
+print(f"⚠️  Skipped {results['skipped']} existing prompts")
+print(f"❌ Errors: {results['errors']}")
+```
+
+### Bulk Import Options
+
+```python
+# Skip prompts already in target
+results = bulk_import(
+    source_provider,
+    target_provider,
+    skip_existing=True  # Don't overwrite existing prompts
+)
+
+# Verbose output for debugging
+results = bulk_import(
+    source_provider,
+    target_provider,
+    verbose=True  # Log each import operation
+)
+```
+
+### Return Value
+
+The `bulk_import()` function returns a dictionary with import statistics:
+
+```python
+{
+    "imported": 42,      # Successfully imported
+    "skipped": 3,        # Skipped (already exist or skip_existing=True)
+    "errors": 1,         # Failed imports
+    "errors_list": [     # Details of failures
+        {"name": "failing_prompt", "error": "Connection timeout"}
+    ]
+}
+```
+
+### What Gets Transferred
+
+All metadata is preserved during bulk import:
+- ✅ Prompt content
+- ✅ Tags (AND intersection filtering supported)
+- ✅ Description
+- ✅ Owner
+- ✅ Versioning (for database targets)
+
 ## Environment Variables
 
 The prompt-assemble library and UI support the following environment variables for configuration:
@@ -370,8 +450,7 @@ pytest tests/ -k "not test_database"
 PGHOST=localhost PGUSER=postgres PGPASSWORD=secret PGDATABASE=test_prompts pytest tests/test_database_source.py
 ```
 
-**Test Coverage:** 118 passing tests covering core library, FileSystem source, and listener system. PostgreSQL-specific
-tests are marked as requiring PostgreSQL.
+**Test Coverage:** 135 passing tests covering core library, FileSystem source, listener system, save/delete operations, and bulk import functionality. PostgreSQL-specific tests are marked as requiring PostgreSQL.
 
 ## Contributing
 

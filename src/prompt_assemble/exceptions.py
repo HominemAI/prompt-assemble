@@ -29,3 +29,9 @@ class SubstitutionError(PromptAssembleError):
     """Raised when substitution fails."""
 
     pass
+
+
+class ReadOnlySourceError(PromptAssembleError):
+    """Raised when a write operation is attempted on a read-only source."""
+
+    pass

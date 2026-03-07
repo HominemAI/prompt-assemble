@@ -110,11 +110,25 @@ class DatabaseSource(PromptSource):
         cursor = None
         try:
             if self._pool is not None:
-                # Get connection from pool
-                connection = self._pool.getconn()
+                # Get connection from pool with retry logic
+                try:
+                    connection = self._pool.getconn()
+                except Exception as e:
+                    logger.error(f"Failed to get connection from pool: {e}")
+                    raise
             else:
                 # Use direct connection
+                if self.connection is None:
+                    raise SourceConnectionError("Database connection is not initialized")
                 connection = self.connection
+
+            # Verify connection is alive before using
+            try:
+                if connection.closed:
+                    raise SourceConnectionError("Database connection is closed")
+            except AttributeError:
+                # SQLite connections don't have a 'closed' attribute, that's ok
+                pass
 
             cursor = connection.cursor()
             yield cursor
@@ -419,16 +433,22 @@ class DatabaseSource(PromptSource):
         return elapsed >= self.refresh_interval_seconds
 
     def _ensure_connection(self):
-        """Reconnect if the connection is closed."""
-        if hasattr(self, '_connection_factory'):
-            try:
-                # Check if connection is still alive
-                cursor = self.connection.cursor()
-                cursor.execute("SELECT 1")
-                cursor.close()
-            except Exception:
-                # Connection is dead, reconnect
-                self.connection = self._connection_factory()
+        """Verify connection is alive (no-op for connection pools)."""
+        # When using a connection pool, connections are managed by the pool
+        # and we get a fresh connection from getconn() each time
+        if self._pool is not None:
+            # Connection pool handles reconnection automatically
+            return
+
+        # For direct connections, verify it's still alive
+        if self.connection is None:
+            raise SourceConnectionError("Database connection is not initialized")
+        try:
+            if hasattr(self.connection, 'closed') and self.connection.closed:
+                raise SourceConnectionError("Database connection is closed")
+        except Exception:
+            # If check fails, let _get_cursor handle it
+            pass
 
     def get_raw(self, name: str) -> str:
         """Get the current version of a prompt by name."""
