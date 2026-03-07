@@ -448,7 +448,7 @@ class TestBulkImport:
         assert set(call_args[1]["tags"]) == {"hello", "greeting"}
 
     def test_bulk_import_skip_existing(self, mock_source):
-        """Test skip_existing flag prevents overwriting."""
+        """Test overwrite=False (default) skips existing prompts."""
         mock_source.add_prompt("p1", "Original content")
         source_provider = PromptProvider(mock_source)
 
@@ -458,15 +458,36 @@ class TestBulkImport:
         target_source.save_prompt = Mock()
         target_provider = PromptProvider(target_source)
 
-        # Import with skip_existing=True
+        # Import with overwrite=False (default)
         results = bulk_import(
-            source_provider, target_provider, skip_existing=True
+            source_provider, target_provider, overwrite=False
         )
 
         # Should skip p1
         assert results["skipped"] == 1
         assert results["imported"] == 0
         target_source.save_prompt.assert_not_called()
+
+    def test_bulk_import_overwrite_existing(self, mock_source):
+        """Test overwrite=True overwrites existing prompts."""
+        mock_source.add_prompt("p1", "New content")
+        source_provider = PromptProvider(mock_source)
+
+        # Target already has p1
+        target_source = MockSource()
+        target_source.add_prompt("p1", "Old content")
+        target_source.save_prompt = Mock()
+        target_provider = PromptProvider(target_source)
+
+        # Import with overwrite=True
+        results = bulk_import(
+            source_provider, target_provider, overwrite=True
+        )
+
+        # Should import/overwrite p1
+        assert results["imported"] == 1
+        assert results["skipped"] == 0
+        target_source.save_prompt.assert_called_once()
 
     def test_bulk_import_readonly_target_raises(self, mock_source):
         """Test that read-only target raises ReadOnlySourceError."""
