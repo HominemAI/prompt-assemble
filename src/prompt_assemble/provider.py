@@ -154,7 +154,7 @@ class PromptProvider:
 def bulk_import(
     source: "PromptProvider",
     target: "PromptProvider",
-    skip_existing: bool = False,
+    overwrite: bool = False,
     verbose: bool = False,
 ) -> Dict[str, Any]:
     """
@@ -166,7 +166,7 @@ def bulk_import(
     Args:
         source: Source PromptProvider to import from
         target: Target PromptProvider to import to (must support save_prompt)
-        skip_existing: If True, skip prompts already in target
+        overwrite: If True, overwrite existing prompts. If False (default), skip existing
         verbose: If True, log each import operation
 
     Returns:
@@ -192,12 +192,12 @@ def bulk_import(
         "errors_list": [],
     }
 
-    target_names = set(target.list()) if skip_existing else set()
+    target_names = set(target.list()) if not overwrite else set()
 
     for name in source.list():
         try:
-            # Skip if already exists and skip_existing is True
-            if skip_existing and name in target_names:
+            # Skip if already exists and overwrite is False
+            if not overwrite and name in target_names:
                 if verbose:
                     logger.info(f"Skipping existing prompt: {name}")
                 results["skipped"] += 1
