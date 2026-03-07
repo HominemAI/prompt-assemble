@@ -13,7 +13,7 @@ __license__ = "MIT"
 from .core import assemble, substitute
 
 # New high-level API
-from .provider import PromptProvider
+from .provider import PromptProvider, bulk_import
 from .sources import (
     PromptSource,
     FileSystemSource,
@@ -26,6 +26,7 @@ from .exceptions import (
     TagResolutionError,
     SourceConnectionError,
     SubstitutionError,
+    ReadOnlySourceError,
 )
 from .registry import RegistryEvent, RegistryListener
 from .sources.base import SourceListener
@@ -36,6 +37,7 @@ __all__ = [
     "substitute",
     # High-level API
     "PromptProvider",
+    "bulk_import",
     # Sources
     "PromptSource",
     "FileSystemSource",
@@ -47,6 +49,7 @@ __all__ = [
     "TagResolutionError",
     "SourceConnectionError",
     "SubstitutionError",
+    "ReadOnlySourceError",
     # Listeners
     "RegistryEvent",
     "RegistryListener",

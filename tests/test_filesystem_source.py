@@ -201,3 +201,67 @@ class TestFileSystemSourceRefresh:
 
         (temp_dir / "new.prompt").write_text("content")
         assert source.is_stale()  # New file added
+
+
+class TestFileSystemSourceSave:
+    """Test save functionality."""
+
+    def test_save_creates_new_prompt(self, temp_dir):
+        """Test that save creates a new prompt file."""
+        source = FileSystemSource(temp_dir)
+        source.save_prompt("greeting", "Hello there!")
+
+        assert "greeting" in source.list()
+        assert source.get_raw("greeting") == "Hello there!"
+
+    def test_save_updates_existing_prompt(self, temp_dir):
+        """Test that save updates an existing prompt."""
+        (temp_dir / "greeting.prompt").write_text("Old content")
+        source = FileSystemSource(temp_dir)
+        assert source.get_raw("greeting") == "Old content"
+
+        source.save_prompt("greeting", "New content")
+        assert source.get_raw("greeting") == "New content"
+
+    def test_save_updates_registry_metadata(self, temp_dir):
+        """Test that save persists tags, description, and owner."""
+        source = FileSystemSource(temp_dir)
+        source.save_prompt(
+            "expert",
+            "Expert instructions",
+            description="Expert persona",
+            tags=["persona", "technical"],
+            owner="alice",
+        )
+
+        # Verify metadata in registry
+        assert source.find_by_tag("persona") == ["expert"]
+        assert source.find_by_tag("technical") == ["expert"]
+        assert source.find_by_tag("persona", "technical") == ["expert"]
+
+    def test_delete_removes_prompt(self, temp_dir):
+        """Test that delete removes the prompt and its metadata."""
+        source = FileSystemSource(temp_dir)
+        source.save_prompt("greeting", "Hello", tags=["greeting_tag"])
+
+        assert "greeting" in source.list()
+        source.delete_prompt("greeting")
+        assert "greeting" not in source.list()
+
+    def test_delete_nonexistent_raises(self, temp_dir):
+        """Test that deleting nonexistent prompt raises error."""
+        source = FileSystemSource(temp_dir)
+        with pytest.raises(PromptNotFoundError):
+            source.delete_prompt("nonexistent")
+
+    def test_save_prompt_appears_in_list(self, temp_dir):
+        """Test that newly saved prompt appears in list."""
+        source = FileSystemSource(temp_dir)
+        assert source.list() == []
+
+        source.save_prompt("first", "content1")
+        assert "first" in source.list()
+
+        source.save_prompt("second", "content2")
+        names = sorted(source.list())
+        assert names == ["first", "second"]

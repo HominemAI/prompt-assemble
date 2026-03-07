@@ -42,6 +42,7 @@ def create_database_source_from_env(table_prefix: Optional[str] = None) -> Datab
     """
     try:
         import psycopg2
+        from psycopg2 import pool
     except ImportError:
         raise ImportError(
             "psycopg2 is required for PostgreSQL support. "
@@ -60,8 +61,12 @@ def create_database_source_from_env(table_prefix: Optional[str] = None) -> Datab
             "DB_PASSWORD environment variable is required for PostgreSQL connection"
         )
 
-    # Create connection with timeout for queries
-    conn = psycopg2.connect(
+    # Create connection pool for resilience and performance
+    # minconn=1: maintain at least 1 connection
+    # maxconn=10: allow up to 10 connections for concurrency
+    connection_pool = pool.SimpleConnectionPool(
+        minconn=1,
+        maxconn=10,
         host=hostname,
         port=port,
         user=username,
@@ -71,12 +76,12 @@ def create_database_source_from_env(table_prefix: Optional[str] = None) -> Datab
     )
 
     logger.info(
-        f"Connected to PostgreSQL: {username}@{hostname}:{port}/{database}"
+        f"Created PostgreSQL connection pool: {username}@{hostname}:{port}/{database} (1-10 connections)"
     )
 
     # Use provided table_prefix or read from environment
     if table_prefix is None:
         table_prefix = os.getenv("PROMPT_ASSEMBLE_TABLE_PREFIX", "pambl_")
 
-    # Create and return DatabaseSource
-    return DatabaseSource(conn, table_prefix=table_prefix)
+    # Create and return DatabaseSource with connection pool
+    return DatabaseSource(connection_pool=connection_pool, table_prefix=table_prefix)

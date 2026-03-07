@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from ..exceptions import PromptNotFoundError, SourceConnectionError
+from ..exceptions import PromptNotFoundError, SourceConnectionError, ReadOnlySourceError
 from ..registry import Registry, RegistryEntry
 from .base import PromptSource
 
@@ -145,6 +145,137 @@ class FileSystemSource(PromptSource):
         except Exception as e:
             logger.warning(f"Failed to load registry from {registry_file}: {e}")
             return {}
+
+    def save_prompt(
+        self,
+        name: str,
+        content: str,
+        description: str = "",
+        tags: Optional[List[str]] = None,
+        owner: Optional[str] = None,
+    ) -> None:
+        """
+        Save or update a prompt.
+
+        Args:
+            name: Prompt name
+            content: Prompt content
+            description: Prompt description
+            tags: List of tags
+            owner: Owner identifier
+        """
+        if tags is None:
+            tags = []
+
+        # Try to find existing prompt file
+        existing_path = self._find_prompt_file(name)
+
+        if existing_path:
+            # Update existing file
+            filepath = existing_path
+            registry_dir = filepath.parent
+        else:
+            # Create new file at root level
+            filepath = self.root / f"{name}.prompt"
+            registry_dir = self.root
+
+        # Write content
+        filepath.write_text(content, encoding="utf-8")
+
+        # Update registry.json in the appropriate directory
+        registry_file = registry_dir / "_registry.json"
+        if registry_file.exists():
+            try:
+                registry_data = json.loads(registry_file.read_text(encoding="utf-8"))
+            except Exception as e:
+                logger.warning(f"Failed to load existing registry: {e}")
+                registry_data = {}
+        else:
+            registry_data = {}
+
+        # Update or create entry (use stem for the key)
+        stem = filepath.stem
+        registry_data[stem] = {
+            "description": description,
+            "tags": tags,
+            "owner": owner,
+        }
+
+        # Write updated registry
+        registry_file.write_text(
+            json.dumps(registry_data, indent=2),
+            encoding="utf-8",
+        )
+
+        # Refresh and emit event
+        self.refresh()
+        self._emit("prompt_saved")
+
+    def delete_prompt(self, name: str) -> None:
+        """
+        Delete a prompt and its metadata.
+
+        Args:
+            name: Prompt name
+
+        Raises:
+            PromptNotFoundError: If prompt not found
+        """
+        # Find the prompt file
+        filepath = self._find_prompt_file(name)
+        if not filepath:
+            raise PromptNotFoundError(f"Prompt not found: {name}")
+
+        # Remove the file
+        filepath.unlink()
+
+        # Update registry.json in the appropriate directory
+        registry_dir = filepath.parent
+        registry_file = registry_dir / "_registry.json"
+
+        if registry_file.exists():
+            try:
+                registry_data = json.loads(registry_file.read_text(encoding="utf-8"))
+                stem = filepath.stem
+                if stem in registry_data:
+                    del registry_data[stem]
+                    # Write updated registry
+                    registry_file.write_text(
+                        json.dumps(registry_data, indent=2),
+                        encoding="utf-8",
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to update registry after delete: {e}")
+
+        # Refresh and emit event
+        self.refresh()
+        self._emit("prompt_deleted")
+
+    def _find_prompt_file(self, name: str) -> Optional[Path]:
+        """
+        Find a prompt file by name, searching the tree.
+
+        Looks for both the exact name and with underscore replacements.
+        Returns the first match found.
+
+        Args:
+            name: Prompt name
+
+        Returns:
+            Path to the prompt file or None if not found
+        """
+        # First, check in content store (from last refresh)
+        if name in self._content_store:
+            # Find the actual file path
+            for dirpath, dirnames, filenames in self._walk_sorted(self.root):
+                dirpath = Path(dirpath)
+                for filename in filenames:
+                    if not filename.endswith(".prompt"):
+                        continue
+                    filepath = dirpath / filename
+                    if self._build_name(filepath) == name:
+                        return filepath
+        return None
 
     @staticmethod
     def _walk_sorted(root: Path):
