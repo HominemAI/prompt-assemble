@@ -237,6 +237,139 @@ All metadata is preserved during bulk import:
 - ✅ Owner
 - ✅ Versioning (for database targets)
 
+## Docker Deployment
+
+### Unified Docker Image (Backend + Frontend)
+
+A pre-built unified image is available that includes both the Python backend and the React frontend in a single container. This is the easiest way to get started with the full application.
+
+**Image Name:** `ghcr.io/{owner}/prompt-assemble-with-ui`
+
+#### Quick Start with Unified Image
+
+**Run with filesystem backend (no database required):**
+
+```bash
+docker run -p 8000:8000 \
+  -v ./prompts:/app/prompts \
+  ghcr.io/hominemAI/prompt-assemble-with-ui:latest
+```
+
+Then open http://localhost:8000 in your browser.
+
+**Run with PostgreSQL database:**
+
+```bash
+docker run -p 8000:8000 \
+  -e DB_HOSTNAME=postgres.example.com \
+  -e DB_PORT=5432 \
+  -e DB_USERNAME=postgres \
+  -e DB_PASSWORD=your_secure_password \
+  -e DB_DATABASE=prompts \
+  -e PROMPT_ASSEMBLE_TABLE_PREFIX=prod_ \
+  ghcr.io/hominemAI/prompt-assemble-with-ui:latest
+```
+
+**With Docker Compose (PostgreSQL):**
+
+```yaml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: prompts
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  prompt-assemble:
+    image: ghcr.io/hominemAI/prompt-assemble-with-ui:latest
+    ports:
+      - "8000:8000"
+    environment:
+      DB_HOSTNAME: postgres
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: secret
+      DB_DATABASE: prompts
+      PROMPT_ASSEMBLE_TABLE_PREFIX: prod_
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+```
+
+#### Building the Unified Image Locally
+
+To build the unified image yourself:
+
+```bash
+docker build -f Dockerfile.unified -t prompt-assemble-with-ui:latest .
+```
+
+The `Dockerfile.unified` multi-stage build:
+1. **Frontend stage**: Clones and builds the frontend from [HominemAI/prompt-assemble-ui](https://github.com/HominemAI/prompt-assemble-ui)
+2. **Backend stage**: Builds the Python prompt-assemble library
+3. **Runtime stage**: Combines both, serving everything on port 8000
+
+#### GitHub Actions Workflow
+
+The `.github/workflows/build-image-with-ui.yml` workflow automatically builds and publishes the unified image:
+
+- **Triggers**: Pushes to `main` and tags matching `ui-v*.*.*`
+- **Image**: Published to GitHub Container Registry as `prompt-assemble-with-ui`
+- **Signing**: Images are signed with cosign for security
+
+To publish a release:
+
+```bash
+git tag ui-v1.0.0
+git push origin ui-v1.0.0
+```
+
+#### Architecture
+
+The unified image uses a single port for both frontend and backend:
+
+- **Port 8000**: All traffic (frontend + API)
+- **Frontend**: React UI served at `/`
+- **API**: REST endpoints at `/api/*`
+- **Frontend automatically configures**: API base URL set to `/api` (relative path)
+
+#### What's Included
+
+- **Backend**: Prompt Assembly library with all features (sigil substitution, versioning, variable sets)
+- **Frontend**: React-based UI from [prompt-assemble-ui](https://github.com/HominemAI/prompt-assemble-ui)
+- **Storage Options**:
+  - Filesystem: `.prompt` files in `/app/prompts` directory
+  - PostgreSQL: Full database backend with versioning and multi-tenancy
+
+#### Environment Variables (Unified Image)
+
+Same as regular backend, plus frontend-specific options:
+
+```bash
+# Backend API (port 8000)
+FLASK_HOST=0.0.0.0
+FLASK_PORT=8000
+
+# Database (optional - defaults to filesystem)
+DB_HOSTNAME=postgres
+DB_PORT=5432
+DB_USERNAME=postgres
+DB_PASSWORD=secret
+DB_DATABASE=prompts
+PROMPT_ASSEMBLE_TABLE_PREFIX=prod_
+
+# Frontend (optional)
+VITE_API_URL=/api  # Default: /api (relative path to port 8000)
+```
+
 ## Environment Variables
 
 The prompt-assemble library and UI support the following environment variables for configuration:

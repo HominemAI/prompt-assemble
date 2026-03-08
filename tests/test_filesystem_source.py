@@ -265,3 +265,251 @@ class TestFileSystemSourceSave:
         source.save_prompt("second", "content2")
         names = sorted(source.list())
         assert names == ["first", "second"]
+
+
+class TestFileSystemSourceVersioning:
+    """Test versioning functionality."""
+
+    def test_save_prompt_creates_version(self, temp_dir):
+        """Test that save creates a version file when increment_version=True."""
+        source = FileSystemSource(temp_dir)
+        source.save_prompt("test", "Content v1", increment_version=True)
+
+        versions = source.list_prompt_versions("test")
+        assert len(versions) == 1
+        assert versions[0]["version"] == 1
+
+    def test_save_prompt_no_version_when_disabled(self, temp_dir):
+        """Test that no version is created when increment_version=False."""
+        source = FileSystemSource(temp_dir)
+        source.save_prompt("test", "Content v1", increment_version=False)
+
+        versions = source.list_prompt_versions("test")
+        assert len(versions) == 0
+
+    def test_get_prompt_version_latest(self, temp_dir):
+        """Test getting latest version (version=None)."""
+        source = FileSystemSource(temp_dir)
+        source.save_prompt("test", "Content v1", increment_version=True)
+        source.save_prompt("test", "Content v2", increment_version=True)
+
+        content = source.get_prompt_version("test", version=None)
+        assert content == "Content v2"
+
+    def test_get_prompt_version_historical(self, temp_dir):
+        """Test getting a specific historical version."""
+        source = FileSystemSource(temp_dir)
+        source.save_prompt("test", "Content v1", increment_version=True)
+        source.save_prompt("test", "Content v2", increment_version=True)
+
+        v1_content = source.get_prompt_version("test", version=1)
+        assert v1_content == "Content v1"
+
+        v2_content = source.get_prompt_version("test", version=2)
+        assert v2_content == "Content v2"
+
+    def test_get_prompt_version_not_found(self, temp_dir):
+        """Test getting nonexistent version raises error."""
+        source = FileSystemSource(temp_dir)
+        with pytest.raises(PromptNotFoundError):
+            source.get_prompt_version("nonexistent")
+
+    def test_get_prompt_version_invalid_version_number(self, temp_dir):
+        """Test getting nonexistent version number raises error."""
+        source = FileSystemSource(temp_dir)
+        source.save_prompt("test", "Content v1", increment_version=True)
+
+        with pytest.raises(PromptNotFoundError):
+            source.get_prompt_version("test", version=99)
+
+    def test_version_history_capped_at_20(self, temp_dir):
+        """Test that only 20 most recent versions are kept."""
+        source = FileSystemSource(temp_dir)
+
+        # Create 25 versions
+        for i in range(1, 26):
+            source.save_prompt("test", f"Content v{i}", increment_version=True)
+
+        versions = source.list_prompt_versions("test")
+        assert len(versions) == 20
+
+        # Should have versions 6-25, not 1-5
+        version_numbers = [v["version"] for v in versions]
+        assert version_numbers == list(range(6, 26))
+
+    def test_list_prompt_versions(self, temp_dir):
+        """Test listing all versions of a prompt."""
+        source = FileSystemSource(temp_dir)
+        source.save_prompt(
+            "test", "Content v1", increment_version=True, revision_comment="Initial"
+        )
+        source.save_prompt(
+            "test", "Content v2", increment_version=True, revision_comment="Update"
+        )
+
+        versions = source.list_prompt_versions("test")
+        assert len(versions) == 2
+        assert versions[0]["version"] == 1
+        assert versions[0]["revision_comment"] == "Initial"
+        assert versions[1]["version"] == 2
+        assert versions[1]["revision_comment"] == "Update"
+
+
+class TestFileSystemSourceVariableSets:
+    """Test variable sets functionality."""
+
+    def test_create_variable_set(self, temp_dir):
+        """Test creating a variable set."""
+        source = FileSystemSource(temp_dir)
+        set_id = source.create_variable_set(
+            "test_set", {"key1": "value1", "key2": "value2"}
+        )
+
+        assert set_id is not None
+        var_set = source.get_variable_set(set_id)
+        assert var_set is not None
+        assert var_set["name"] == "test_set"
+        assert var_set["variables"] == {"key1": "value1", "key2": "value2"}
+
+    def test_get_variable_set(self, temp_dir):
+        """Test retrieving a variable set by ID."""
+        source = FileSystemSource(temp_dir)
+        set_id = source.create_variable_set("test_set", {"x": "y"})
+
+        retrieved = source.get_variable_set(set_id)
+        assert retrieved["id"] == set_id
+        assert retrieved["name"] == "test_set"
+        assert retrieved["variables"]["x"] == "y"
+
+    def test_list_variable_sets(self, temp_dir):
+        """Test listing all variable sets."""
+        source = FileSystemSource(temp_dir)
+        source.create_variable_set("set_a", {"x": "1"})
+        source.create_variable_set("set_b", {"y": "2"})
+
+        sets = source.list_variable_sets()
+        assert len(sets) == 2
+        names = [s["name"] for s in sets]
+        assert "set_a" in names
+        assert "set_b" in names
+
+    def test_update_variable_set(self, temp_dir):
+        """Test updating a variable set."""
+        source = FileSystemSource(temp_dir)
+        set_id = source.create_variable_set("original", {"x": "1"})
+
+        source.update_variable_set(set_id, name="updated", variables={"y": "2"})
+
+        updated = source.get_variable_set(set_id)
+        assert updated["name"] == "updated"
+        assert updated["variables"] == {"y": "2"}
+
+    def test_delete_variable_set(self, temp_dir):
+        """Test deleting a variable set."""
+        source = FileSystemSource(temp_dir)
+        set_id = source.create_variable_set("to_delete", {"x": "1"})
+
+        source.delete_variable_set(set_id)
+
+        assert source.get_variable_set(set_id) is None
+
+    def test_delete_variable_set_cascades(self, temp_dir):
+        """Test that deleting a set removes it from selections and overrides."""
+        source = FileSystemSource(temp_dir)
+        source.save_prompt("test", "content")
+        set_id = source.create_variable_set("test_set", {"x": "1"})
+
+        source.set_active_variable_sets("test", [set_id])
+        source.set_variable_overrides("test", set_id, {"x": "override"})
+
+        source.delete_variable_set(set_id)
+
+        # Selection should be gone
+        active = source.get_active_variable_sets("test")
+        assert len(active) == 0
+
+        # Overrides should be gone
+        overrides = source.get_variable_overrides("test", set_id)
+        assert overrides == {}
+
+
+class TestFileSystemSourceVariableSetSelections:
+    """Test variable set selections."""
+
+    def test_get_active_variable_sets(self, temp_dir):
+        """Test getting active variable sets for a prompt."""
+        source = FileSystemSource(temp_dir)
+        source.save_prompt("test", "content")
+        set_id1 = source.create_variable_set("set1", {"x": "1"})
+        set_id2 = source.create_variable_set("set2", {"y": "2"})
+
+        source.set_active_variable_sets("test", [set_id1, set_id2])
+
+        active = source.get_active_variable_sets("test")
+        assert len(active) == 2
+        assert active[0]["name"] == "set1"
+        assert active[1]["name"] == "set2"
+
+    def test_set_active_variable_sets(self, temp_dir):
+        """Test setting active variable sets for a prompt."""
+        source = FileSystemSource(temp_dir)
+        source.save_prompt("test", "content")
+        set_id = source.create_variable_set("test_set", {"x": "1"})
+
+        source.set_active_variable_sets("test", [set_id])
+
+        active = source.get_active_variable_sets("test")
+        assert len(active) == 1
+        assert active[0]["id"] == set_id
+
+    def test_set_active_variable_sets_replaces(self, temp_dir):
+        """Test that setting selections replaces previous ones."""
+        source = FileSystemSource(temp_dir)
+        source.save_prompt("test", "content")
+        set_id1 = source.create_variable_set("set1", {"x": "1"})
+        set_id2 = source.create_variable_set("set2", {"y": "2"})
+
+        source.set_active_variable_sets("test", [set_id1])
+        source.set_active_variable_sets("test", [set_id2])
+
+        active = source.get_active_variable_sets("test")
+        assert len(active) == 1
+        assert active[0]["id"] == set_id2
+
+
+class TestFileSystemSourceVariableOverrides:
+    """Test variable overrides."""
+
+    def test_get_variable_overrides(self, temp_dir):
+        """Test getting override values."""
+        source = FileSystemSource(temp_dir)
+        source.save_prompt("test", "content")
+        set_id = source.create_variable_set("test_set", {"x": "1", "y": "2"})
+
+        source.set_variable_overrides("test", set_id, {"x": "override"})
+
+        overrides = source.get_variable_overrides("test", set_id)
+        assert overrides == {"x": "override"}
+
+    def test_set_variable_overrides(self, temp_dir):
+        """Test setting override values."""
+        source = FileSystemSource(temp_dir)
+        source.save_prompt("test", "content")
+        set_id = source.create_variable_set("test_set", {"x": "1"})
+
+        source.set_variable_overrides("test", set_id, {"x": "overridden"})
+
+        overrides = source.get_variable_overrides("test", set_id)
+        assert overrides == {"x": "overridden"}
+
+    def test_set_variable_overrides_replaces(self, temp_dir):
+        """Test that setting overrides replaces previous ones."""
+        source = FileSystemSource(temp_dir)
+        source.save_prompt("test", "content")
+        set_id = source.create_variable_set("test_set", {"x": "1", "y": "2"})
+
+        source.set_variable_overrides("test", set_id, {"x": "a"})
+        source.set_variable_overrides("test", set_id, {"y": "b"})
+
+        overrides = source.get_variable_overrides("test", set_id)
+        assert overrides == {"y": "b"}

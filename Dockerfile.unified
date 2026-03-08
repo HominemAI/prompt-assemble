@@ -1,0 +1,80 @@
+# Frontend build stage - pulls from external repo
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /frontend
+
+# Install git (needed to clone repository)
+RUN apk add --no-cache git
+
+# Build arguments for frontend customization
+ARG FRONTEND_REPO=https://github.com/HominemAI/prompt-assemble-ui.git
+ARG FRONTEND_BRANCH=main
+
+# Clone the frontend repository
+RUN git clone --branch ${FRONTEND_BRANCH} ${FRONTEND_REPO} . && \
+    npm ci
+
+# Build frontend with Vite
+# Set API endpoint to port 8000 (will be set via environment variable at build time if needed)
+ENV VITE_API_URL=/api
+RUN npm run build
+
+# Backend build stage
+FROM python:3.11-slim AS py-builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and source
+COPY setup.py pyproject.toml README.md LICENSE /app/
+COPY src/ /app/src/
+
+# Install prompt-assemble with database dependencies
+RUN pip install --no-cache-dir -e ".[db]"
+
+# Runtime stage
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed Python packages from builder
+COPY --from=py-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=py-builder /usr/local/bin /usr/local/bin
+
+# Copy application code
+COPY --from=py-builder /app/src /app/src
+
+# Copy built frontend assets - serving from Flask
+COPY --from=frontend-builder /frontend/dist /app/src/prompt_assemble/ui/frontend/dist
+
+# Create prompts directory for filesystem-based prompts
+RUN mkdir -p /app/prompts
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PORT=8000 \
+    FLASK_HOST=0.0.0.0 \
+    FLASK_PORT=8000
+
+# Expose port
+EXPOSE 8000
+
+# Health check - check that API is responding
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/api/prompts || exit 1
+
+# Default command - start Flask server
+# The server will serve both the API and the frontend static files
+# Database environment variables required: DB_HOSTNAME, DB_PORT, DB_USERNAME, DB_PASSWORD, DB_DATABASE
+# Optional: PROMPT_ASSEMBLE_TABLE_PREFIX for multi-tenancy
+CMD ["python", "-c", "from prompt_assemble.ui.server import run_server; from prompt_assemble.sources import create_database_source_from_env; run_server(source=create_database_source_from_env(), host='0.0.0.0', port=8000, debug=False)"]
