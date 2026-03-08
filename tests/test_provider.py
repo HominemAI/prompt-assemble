@@ -37,6 +37,15 @@ class MockSource(PromptSource):
                 matching.append(name)
         return matching
 
+    def find_by_owner(self, owner: str) -> list[str]:
+        """Find prompts by owner."""
+        matching = []
+        for name in self.prompts.keys():
+            entry = self._registry.get(name)
+            if entry and entry.owner == owner:
+                matching.append(name)
+        return matching
+
     def list(self) -> list[str]:
         """List all prompt names."""
         return list(self.prompts.keys())
@@ -45,12 +54,12 @@ class MockSource(PromptSource):
         """Refresh (no-op for mock)."""
         pass
 
-    def add_prompt(self, name: str, content: str, tags: list = None):
+    def add_prompt(self, name: str, content: str, tags: list = None, owner: str = None):
         """Add a prompt to the mock source."""
         self.prompts[name] = content
         self.tags[name] = tags or []
         # Register in registry
-        entry = RegistryEntry(name=name, tags=tags or [])
+        entry = RegistryEntry(name=name, tags=tags or [], owner=owner)
         self._registry.register(entry)
 
 
