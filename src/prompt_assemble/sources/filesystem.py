@@ -101,6 +101,10 @@ class FileSystemSource(PromptSource):
         """Find all prompt names matching ALL tags (AND intersection)."""
         return self._registry.find_by_tags(*tags)
 
+    def find_by_owner(self, owner: str) -> List[str]:
+        """Find all prompt names owned by a specific owner."""
+        return self._registry.find_by_owner(owner)
+
     def list(self) -> List[str]:
         """List all available prompt names."""
         return self._registry.list_names()

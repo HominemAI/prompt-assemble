@@ -80,6 +80,19 @@ class PromptSource(ABC):
         pass
 
     @abstractmethod
+    def find_by_owner(self, owner: str) -> List[str]:
+        """
+        Find all prompt names owned by a specific owner.
+
+        Args:
+            owner: Owner name to search for
+
+        Returns:
+            List of prompt names owned by the owner, in insertion order
+        """
+        pass
+
+    @abstractmethod
     def list(self) -> List[str]:
         """
         List all available prompt names.

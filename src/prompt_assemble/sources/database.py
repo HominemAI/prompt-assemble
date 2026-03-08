@@ -267,6 +267,7 @@ class DatabaseSource(PromptSource):
                             CREATE TABLE {table_name} (
                                 id TEXT PRIMARY KEY,
                                 name TEXT UNIQUE NOT NULL,
+                                owner TEXT,
                                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                             )
@@ -277,6 +278,16 @@ class DatabaseSource(PromptSource):
                         logger.warning(f"Could not create variable_sets table: {e}")
                 else:
                     logger.info(f"✓ Table {table_name} already exists")
+                    # Add owner column if it doesn't exist (for backwards compatibility)
+                    try:
+                        cursor.execute(
+                            f"ALTER TABLE {table_name} ADD COLUMN owner TEXT"
+                        )
+                        logger.info(f"Added owner column to {table_name}")
+                    except Exception as e:
+                        # Silently ignore if column already exists
+                        if "already exists" not in str(e).lower() and "duplicate column" not in str(e).lower():
+                            logger.debug(f"Could not add owner column to {table_name}: {e}")
 
                 table_name = self._table('variable_set_variables')
                 if not self._table_exists(cursor, table_name):
@@ -558,6 +569,12 @@ class DatabaseSource(PromptSource):
             self.refresh()
         return self._registry.find_by_tags(*tags)
 
+    def find_by_owner(self, owner: str) -> List[str]:
+        """Find all prompt names owned by a specific owner."""
+        if self._should_refresh():
+            self.refresh()
+        return self._registry.find_by_owner(owner)
+
     def list(self) -> List[str]:
         """List all available prompt names."""
         if self._should_refresh():
@@ -697,13 +714,14 @@ class DatabaseSource(PromptSource):
 
     # Variable Sets Management Methods
 
-    def create_variable_set(self, name: str, variables: Optional[Dict[str, str]] = None) -> str:
+    def create_variable_set(self, name: str, variables: Optional[Dict[str, str]] = None, owner: Optional[str] = None) -> str:
         """
         Create a new variable set.
 
         Args:
             name: Variable set name
             variables: Dict of key-value pairs
+            owner: Optional owner for scoped variable sets (None = global)
 
         Returns:
             Variable set ID
@@ -716,8 +734,8 @@ class DatabaseSource(PromptSource):
         with self._get_cursor() as cursor:
             set_id = str(uuid.uuid4())
             cursor.execute(
-                f"INSERT INTO {self._table('variable_sets')} (id, name) VALUES (%s, %s)",
-                (set_id, name),
+                f"INSERT INTO {self._table('variable_sets')} (id, name, owner) VALUES (%s, %s, %s)",
+                (set_id, name, owner),
             )
 
             # Add variables
@@ -748,9 +766,24 @@ class DatabaseSource(PromptSource):
             return {"id": set_id, "name": name, "variables": variables}
 
     def list_variable_sets(self) -> List[Dict[str, Any]]:
-        """List all variable sets."""
+        """List all variable sets (global and all scoped)."""
         with self._get_cursor() as cursor:
-            cursor.execute(f"SELECT id, name FROM {self._table('variable_sets')} ORDER BY name")
+            cursor.execute(f"SELECT id, name, owner FROM {self._table('variable_sets')} ORDER BY name")
+            sets = []
+            for row in cursor.fetchall():
+                set_id, name, owner = row
+                cursor.execute(
+                    f"SELECT key, value FROM {self._table('variable_set_variables')} WHERE variable_set_id = %s",
+                    (set_id,),
+                )
+                variables = {r[0]: r[1] for r in cursor.fetchall()}
+                sets.append({"id": set_id, "name": name, "owner": owner, "variables": variables})
+            return sets
+
+    def list_global_variable_sets(self) -> List[Dict[str, Any]]:
+        """List only global (unscoped) variable sets."""
+        with self._get_cursor() as cursor:
+            cursor.execute(f"SELECT id, name FROM {self._table('variable_sets')} WHERE owner IS NULL ORDER BY name")
             sets = []
             for row in cursor.fetchall():
                 set_id, name = row
@@ -759,19 +792,58 @@ class DatabaseSource(PromptSource):
                     (set_id,),
                 )
                 variables = {r[0]: r[1] for r in cursor.fetchall()}
-                sets.append({"id": set_id, "name": name, "variables": variables})
+                sets.append({"id": set_id, "name": name, "owner": None, "variables": variables})
             return sets
 
+    def list_variable_sets_by_owner(self, owner: str) -> List[Dict[str, Any]]:
+        """List variable sets scoped to a specific owner."""
+        with self._get_cursor() as cursor:
+            cursor.execute(f"SELECT id, name FROM {self._table('variable_sets')} WHERE owner = %s ORDER BY name", (owner,))
+            sets = []
+            for row in cursor.fetchall():
+                set_id, name = row
+                cursor.execute(
+                    f"SELECT key, value FROM {self._table('variable_set_variables')} WHERE variable_set_id = %s",
+                    (set_id,),
+                )
+                variables = {r[0]: r[1] for r in cursor.fetchall()}
+                sets.append({"id": set_id, "name": name, "owner": owner, "variables": variables})
+            return sets
+
+    def get_available_variable_sets(self, owner: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Get variable sets available to a prompt owner.
+        Returns global sets + sets scoped to the owner.
+        """
+        global_sets = self.list_global_variable_sets()
+        if owner:
+            owner_sets = self.list_variable_sets_by_owner(owner)
+            return global_sets + owner_sets
+        return global_sets
+
     def update_variable_set(self, set_id: str, name: Optional[str] = None,
-                            variables: Optional[Dict[str, str]] = None) -> None:
+                            variables: Optional[Dict[str, str]] = None, owner: Optional[str] = None) -> None:
         """Update a variable set."""
         import uuid
         self._ensure_connection()
         with self._get_cursor() as cursor:
+            # Build update query
+            updates = []
+            params = []
             if name:
+                updates.append("name = %s")
+                params.append(name)
+            if owner is not None:
+                updates.append("owner = %s")
+                params.append(owner)
+
+            if updates:
+                updates.append("updated_at = CURRENT_TIMESTAMP")
+                params.append(set_id)
+                update_sql = ", ".join(updates)
                 cursor.execute(
-                    f"UPDATE {self._table('variable_sets')} SET name = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
-                    (name, set_id),
+                    f"UPDATE {self._table('variable_sets')} SET {update_sql} WHERE id = %s",
+                    params,
                 )
 
             if variables is not None:
