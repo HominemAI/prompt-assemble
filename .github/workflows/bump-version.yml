@@ -61,9 +61,7 @@ jobs:
       - name: Commit version bump
         run: |
           git add pyproject.toml src/prompt_assemble/__init__.py src/prompt_assemble/cli.py
-          git commit -m "Version Bump ${{ inputs.version }}
-
-          Co-Authored-By: GitHub Action <action@github.com>"
+          git commit -m "Version Bump ${{ inputs.version }}"
 
       - name: Create and push tag
         run: |
