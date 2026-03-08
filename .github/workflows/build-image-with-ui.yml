@@ -1,0 +1,178 @@
+name: Build and Push Unified Image with UI
+
+on:
+  push:
+    # Publish version tags as releases
+    branches:
+      - main
+    tags:
+      - 'ui-v*.*.*'
+
+env:
+  # Use ghcr.io for GitHub Container Registry
+  REGISTRY: ghcr.io
+  # Image name for the unified image
+  IMAGE_NAME: ${{ github.repository }}-with-ui
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Install the cosign tool except on PR
+      - name: Install cosign
+        if: github.event_name != 'pull_request'
+        uses: sigstore/cosign-installer@v3.5.0
+        with:
+          cosign-release: 'v2.2.4'
+
+      - name: Check cosign install
+        run: cosign version
+
+      # Login against a Docker registry except on PR
+      - name: Log into registry ${{ env.REGISTRY }}
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Setup Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Extract metadata (tags, labels) for Docker
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}},prefix=ui-v
+            type=semver,pattern={{major}}.{{minor}},prefix=ui-v
+            type=semver,pattern={{major}},prefix=ui-v
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # Build and push Docker image with Buildx
+      - name: Build and push Docker image
+        id: build-and-push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.unified
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            FRONTEND_REPO=https://github.com/HominemAI/prompt-assemble-ui.git
+            FRONTEND_BRANCH=main
+
+      # Sign the resulting Docker image digest except on PRs
+      - name: Sign the published Docker image
+        if: ${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/ui-v') }}
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build-and-push.outputs.digest }}
+        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+
+  notify:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/ui-v')
+    needs: build
+    permissions:
+      contents: write
+    steps:
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          body: |
+            # Unified Docker Image (Backend + UI) Published
+
+            Complete Docker image with both Python backend and React frontend, all in one container.
+
+            **Image:** `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}`
+            **Tag:** `${{ steps.version.outputs.VERSION }}`
+            **Pull Command:**
+            ```bash
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+            ```
+
+            ## What's Included
+
+            - **Backend**: Prompt Assembly library with sigil-based substitution (API on port 8000)
+            - **Frontend**: React-based prompt management UI from [prompt-assemble-ui](https://github.com/HominemAI/prompt-assemble-ui)
+            - **Database Support**: PostgreSQL backend with versioning and multi-tenancy
+            - **Features**:
+              - Web-based prompt editor with syntax highlighting
+              - Tag-based prompt organization and filtering
+              - Variable sets and advanced substitution
+              - Auto-save and version history
+              - Export functionality
+              - Live autocomplete
+
+            ## Quick Start
+
+            ### With Filesystem Backend (no database):
+            ```bash
+            docker run -p 8000:8000 \
+              -v ./prompts:/app/prompts \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+            ```
+
+            ### With PostgreSQL Database:
+            ```bash
+            docker run -p 8000:8000 \
+              -e DB_HOSTNAME=your-postgres-host \
+              -e DB_PORT=5432 \
+              -e DB_USERNAME=postgres \
+              -e DB_PASSWORD=your-password \
+              -e DB_DATABASE=prompts \
+              -e PROMPT_ASSEMBLE_TABLE_PREFIX=pa_ \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+            ```
+
+            Open http://localhost:8000 in your browser to access the UI.
+
+            ## Environment Variables
+
+            ### Frontend Configuration
+            - `VITE_API_URL` - Frontend API endpoint (default: `/api`)
+
+            ### Database Configuration (optional, defaults to filesystem)
+            - `DB_HOSTNAME` - PostgreSQL hostname
+            - `DB_PORT` - PostgreSQL port (default: 5432)
+            - `DB_USERNAME` - PostgreSQL username
+            - `DB_PASSWORD` - PostgreSQL password (required if using DB)
+            - `DB_DATABASE` - PostgreSQL database name (default: prompts)
+            - `PROMPT_ASSEMBLE_TABLE_PREFIX` - Table prefix for multi-tenancy
+
+            ### Server Configuration
+            - `FLASK_HOST` - Flask server host (default: 0.0.0.0)
+            - `FLASK_PORT` - Flask server port (default: 8000)
+
+            ## Architecture
+
+            - **Single Port**: Everything accessible on port 8000
+            - **API Endpoint**: `http://localhost:8000/api`
+            - **Frontend**: Served at root (`http://localhost:8000`)
+            - **Frontend Code**: React + Vite from [prompt-assemble-ui](https://github.com/HominemAI/prompt-assemble-ui)
+
+            For detailed documentation, see [README.md](https://github.com/${{ github.repository }}/blob/main/README.md)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
