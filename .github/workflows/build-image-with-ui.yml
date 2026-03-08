@@ -3,7 +3,7 @@ name: Build and Push Unified Image with UI
 on:
   push:
     tags:
-      - 'ui-v*.*.*'
+      - 'v*.*.*'
 
 env:
   # Use ghcr.io for GitHub Container Registry
@@ -53,11 +53,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}},prefix=ui-v
-            type=semver,pattern={{major}}.{{minor}},prefix=ui-v
-            type=semver,pattern={{major}},prefix=ui-v
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
 
       # Build and push Docker image with Buildx
       - name: Build and push Docker image
@@ -77,7 +75,7 @@ jobs:
 
       # Sign the resulting Docker image digest except on PRs
       - name: Sign the published Docker image
-        if: ${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/ui-v') }}
+        if: ${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') }}
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build-and-push.outputs.digest }}
@@ -85,7 +83,7 @@ jobs:
 
   notify:
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/ui-v')
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     permissions:
       contents: write
