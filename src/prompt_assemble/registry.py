@@ -99,6 +99,15 @@ class Registry:
 
         return matching_names
 
+    def find_by_owner(self, owner: str) -> List[str]:
+        """Find all prompt names owned by a specific owner."""
+        matching_names = []
+        for name, entry in self._entries.items():
+            if entry.owner == owner:
+                matching_names.append(name)
+
+        return matching_names
+
     def list_names(self) -> List[str]:
         """List all registered prompt names in insertion order."""
         return list(self._entries.keys())
