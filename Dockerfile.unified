@@ -55,7 +55,8 @@ COPY --from=py-builder /usr/local/bin /usr/local/bin
 COPY --from=py-builder /app/src /app/src
 
 # Copy built frontend assets - serving from Flask
-COPY --from=frontend-builder /frontend/dist /app/src/prompt_assemble/ui/frontend/dist
+# Frontend builds to static/, which Flask will serve from /api/static directory
+COPY --from=frontend-builder /frontend/static /app/src/prompt_assemble/api/static
 
 # Create prompts directory for filesystem-based prompts
 RUN mkdir -p /app/prompts

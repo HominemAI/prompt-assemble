@@ -2,9 +2,6 @@ name: Build and Push Unified Image with UI
 
 on:
   push:
-    # Publish version tags as releases
-    branches:
-      - main
     tags:
       - 'ui-v*.*.*'
 
