@@ -42,33 +42,34 @@ jobs:
           echo "Version format valid: ${{ inputs.version }}"
 
       - name: Update version files
-        run: python3 << 'EOF'
-import re
+        run: |
+          python3 << 'EOF'
+          import re
 
-# Update pyproject.toml
-with open('pyproject.toml', 'r') as f:
-    content = f.read()
-content = re.sub(r'version = "[^"]*"', f'version = "${{ inputs.version }}"', content)
-with open('pyproject.toml', 'w') as f:
-    f.write(content)
-print("Updated pyproject.toml")
+          # Update pyproject.toml
+          with open('pyproject.toml', 'r') as f:
+              content = f.read()
+          content = re.sub(r'version = "[^"]*"', f'version = "${{ inputs.version }}"', content)
+          with open('pyproject.toml', 'w') as f:
+              f.write(content)
+          print("Updated pyproject.toml")
 
-# Update __init__.py
-with open('src/prompt_assemble/__init__.py', 'r') as f:
-    content = f.read()
-content = re.sub(r'__version__ = "[^"]*"', f'__version__ = "${{ inputs.version }}"', content)
-with open('src/prompt_assemble/__init__.py', 'w') as f:
-    f.write(content)
-print("Updated __init__.py")
+          # Update __init__.py
+          with open('src/prompt_assemble/__init__.py', 'r') as f:
+              content = f.read()
+          content = re.sub(r'__version__ = "[^"]*"', f'__version__ = "${{ inputs.version }}"', content)
+          with open('src/prompt_assemble/__init__.py', 'w') as f:
+              f.write(content)
+          print("Updated __init__.py")
 
-# Update cli.py
-with open('src/prompt_assemble/cli.py', 'r') as f:
-    content = f.read()
-content = re.sub(r"version='%(prog)s [^']*'", f"version='%(prog)s ${{ inputs.version }}'", content)
-with open('src/prompt_assemble/cli.py', 'w') as f:
-    f.write(content)
-print("Updated cli.py")
-EOF
+          # Update cli.py
+          with open('src/prompt_assemble/cli.py', 'r') as f:
+              content = f.read()
+          content = re.sub(r"version='%(prog)s [^']*'", f"version='%(prog)s ${{ inputs.version }}'", content)
+          with open('src/prompt_assemble/cli.py', 'w') as f:
+              f.write(content)
+          print("Updated cli.py")
+          EOF
 
       - name: Verify changes
         run: |
