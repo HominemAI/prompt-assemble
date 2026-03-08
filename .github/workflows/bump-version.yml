@@ -1,0 +1,88 @@
+name: Bump Version and Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New version (e.g., 0.2.4)'
+        required: true
+        type: string
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Validate version format
+        run: |
+          if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version format. Expected: X.Y.Z (e.g., 0.2.4)"
+            exit 1
+          fi
+          echo "Version format valid: ${{ inputs.version }}"
+
+      - name: Update pyproject.toml
+        run: |
+          sed -i 's/version = "[^"]*"/version = "${{ inputs.version }}"/' pyproject.toml
+          echo "Updated pyproject.toml"
+
+      - name: Update __init__.py
+        run: |
+          sed -i 's/__version__ = "[^"]*"/__version__ = "${{ inputs.version }}"/' src/prompt_assemble/__init__.py
+          echo "Updated __init__.py"
+
+      - name: Update cli.py
+        run: |
+          sed -i "s/version='%(prog)s [^']*'/version='%(prog)s ${{ inputs.version }}'/" src/prompt_assemble/cli.py
+          echo "Updated cli.py"
+
+      - name: Verify changes
+        run: |
+          echo "=== pyproject.toml ==="
+          grep "version = " pyproject.toml
+          echo ""
+          echo "=== __init__.py ==="
+          grep "__version__" src/prompt_assemble/__init__.py
+          echo ""
+          echo "=== cli.py ==="
+          grep "version='%(prog)s" src/prompt_assemble/cli.py
+
+      - name: Commit version bump
+        run: |
+          git add pyproject.toml src/prompt_assemble/__init__.py src/prompt_assemble/cli.py
+          git commit -m "Version Bump ${{ inputs.version }}
+
+Co-Authored-By: GitHub Action <action@github.com>"
+
+      - name: Create and push tag
+        run: |
+          git tag "v${{ inputs.version }}"
+          git push origin main --follow-tags
+          echo "Created and pushed tag: v${{ inputs.version }}"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ inputs.version }}
+          body: |
+            # Version ${{ inputs.version }}
+
+            Automated version bump and release.
+
+            Docker images will be built automatically:
+            - Backend only: `ghcr.io/${{ github.repository }}:${{ inputs.version }}`
+            - With UI: `ghcr.io/${{ github.repository }}-with-ui:${{ inputs.version }}`
+
+            PyPI package will be available at: https://pypi.org/project/prompt-assemble/${{ inputs.version }}/
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
