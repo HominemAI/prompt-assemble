@@ -41,20 +41,34 @@ jobs:
           fi
           echo "Version format valid: ${{ inputs.version }}"
 
-      - name: Update pyproject.toml
-        run: |
-          sed -i '' 's/version = "[^"]*"/version = "${{ inputs.version }}"/' pyproject.toml
-          echo "Updated pyproject.toml"
+      - name: Update version files
+        run: python3 << 'EOF'
+import re
 
-      - name: Update __init__.py
-        run: |
-          sed -i '' 's/__version__ = "[^"]*"/__version__ = "${{ inputs.version }}"/' src/prompt_assemble/__init__.py
-          echo "Updated __init__.py"
+# Update pyproject.toml
+with open('pyproject.toml', 'r') as f:
+    content = f.read()
+content = re.sub(r'version = "[^"]*"', f'version = "${{ inputs.version }}"', content)
+with open('pyproject.toml', 'w') as f:
+    f.write(content)
+print("Updated pyproject.toml")
 
-      - name: Update cli.py
-        run: |
-          sed -i '' "s/version='%(prog)s [^']*'/version='%(prog)s ${{ inputs.version }}'/" src/prompt_assemble/cli.py
-          echo "Updated cli.py"
+# Update __init__.py
+with open('src/prompt_assemble/__init__.py', 'r') as f:
+    content = f.read()
+content = re.sub(r'__version__ = "[^"]*"', f'__version__ = "${{ inputs.version }}"', content)
+with open('src/prompt_assemble/__init__.py', 'w') as f:
+    f.write(content)
+print("Updated __init__.py")
+
+# Update cli.py
+with open('src/prompt_assemble/cli.py', 'r') as f:
+    content = f.read()
+content = re.sub(r"version='%(prog)s [^']*'", f"version='%(prog)s ${{ inputs.version }}'", content)
+with open('src/prompt_assemble/cli.py', 'w') as f:
+    f.write(content)
+print("Updated cli.py")
+EOF
 
       - name: Verify changes
         run: |
