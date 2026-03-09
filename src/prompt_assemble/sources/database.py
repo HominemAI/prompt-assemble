@@ -150,10 +150,14 @@ class DatabaseSource(PromptSource):
         return f"{self.table_prefix}{name}"
 
     def _table_exists(self, cursor, table_name: str) -> bool:
-        """Check if a table exists in the database (PostgreSQL only)."""
+        """Check if a table exists in the database.
+
+        Note: PostgreSQL stores unquoted table names as lowercase in information_schema,
+        so we check with lowercase to handle case-insensitive matching.
+        """
         cursor.execute(
             "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name=%s)",
-            (table_name,)
+            (table_name.lower(),)
         )
         result = cursor.fetchone()
         return bool(result[0]) if result else False
