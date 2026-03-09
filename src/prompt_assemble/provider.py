@@ -530,45 +530,95 @@ def bulk_import(
                 logger.info(f"Skipping existing prompt: {name}")
             results["skipped"] += 1
 
+    # Check if target supports batch operations (faster for large imports)
+    has_batch_save = hasattr(target.source, "batch_save_prompts")
+
     # Process in batches
     for batch_start in range(0, len(to_import), batch_size):
         batch = to_import[batch_start : batch_start + batch_size]
 
-        for name in batch:
-            try:
-                # Get content from source
-                content = source.get_raw(name)
+        if has_batch_save:
+            # Use batch save for better performance
+            batch_prompts = []
+            for name in batch:
+                try:
+                    # Get content from source
+                    content = source.get_raw(name)
 
-                # Get metadata from source's registry if available
-                metadata = {
-                    "description": "",
-                    "tags": [],
-                    "owner": None,
-                }
+                    # Get metadata from source's registry if available
+                    metadata = {
+                        "description": "",
+                        "tags": [],
+                        "owner": None,
+                    }
 
-                if hasattr(source.source, "_registry"):
-                    entry = source.source._registry.get(name)
-                    if entry:
-                        metadata = {
-                            "description": entry.description,
-                            "tags": entry.tags,
-                            "owner": entry.owner,
-                        }
+                    if hasattr(source.source, "_registry"):
+                        entry = source.source._registry.get(name)
+                        if entry:
+                            metadata = {
+                                "description": entry.description,
+                                "tags": entry.tags,
+                                "owner": entry.owner,
+                            }
 
-                # Save to target with metadata
-                target.save_prompt(name, content, **metadata)
+                    batch_prompts.append({
+                        "name": name,
+                        "content": content,
+                        **metadata
+                    })
+                except Exception as e:
+                    results["errors"] += 1
+                    error_detail = {"name": name, "error": str(e)}
+                    results["errors_list"].append(error_detail)
+                    logger.error(f"Error preparing prompt '{name}': {e}")
 
-                if verbose:
-                    logger.info(
-                        f"Imported prompt '{name}' with {len(metadata.get('tags', []))} tags"
-                    )
+            # Save entire batch in one transaction
+            if batch_prompts:
+                try:
+                    saved = target.source.batch_save_prompts(batch_prompts)
+                    results["imported"] += saved
+                    if verbose:
+                        logger.info(f"Batch imported {saved} prompts")
+                except Exception as e:
+                    logger.error(f"Error in batch save: {e}")
+                    results["errors"] += len(batch_prompts)
+        else:
+            # Fallback to individual saves for sources without batch support
+            for name in batch:
+                try:
+                    # Get content from source
+                    content = source.get_raw(name)
 
-                results["imported"] += 1
+                    # Get metadata from source's registry if available
+                    metadata = {
+                        "description": "",
+                        "tags": [],
+                        "owner": None,
+                    }
 
-            except Exception as e:
-                results["errors"] += 1
-                error_detail = {"name": name, "error": str(e)}
-                results["errors_list"].append(error_detail)
-                logger.error(f"Error importing prompt '{name}': {e}")
+                    if hasattr(source.source, "_registry"):
+                        entry = source.source._registry.get(name)
+                        if entry:
+                            metadata = {
+                                "description": entry.description,
+                                "tags": entry.tags,
+                                "owner": entry.owner,
+                            }
+
+                    # Save to target with metadata
+                    target.save_prompt(name, content, **metadata)
+
+                    if verbose:
+                        logger.info(
+                            f"Imported prompt '{name}' with {len(metadata.get('tags', []))} tags"
+                        )
+
+                    results["imported"] += 1
+
+                except Exception as e:
+                    results["errors"] += 1
+                    error_detail = {"name": name, "error": str(e)}
+                    results["errors_list"].append(error_detail)
+                    logger.error(f"Error importing prompt '{name}': {e}")
 
     return results

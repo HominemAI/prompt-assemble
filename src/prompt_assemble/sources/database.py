@@ -716,6 +716,106 @@ class DatabaseSource(PromptSource):
             self._emit("prompt_saved")
             return prompt_id
 
+    def batch_save_prompts(self, prompts: List[Dict[str, Any]]) -> int:
+        """
+        Save multiple prompts in a single transaction (for bulk import).
+
+        Much faster than calling save_prompt() individually because it batches
+        all database operations into one transaction.
+
+        Args:
+            prompts: List of dicts with keys: name, content, description, tags, owner
+
+        Returns:
+            Number of prompts successfully saved
+        """
+        import uuid
+
+        if not prompts:
+            return 0
+
+        self._ensure_connection()
+        saved_count = 0
+
+        with self._get_cursor() as cursor:
+            try:
+                cursor.connection.autocommit = False
+
+                for prompt_data in prompts:
+                    try:
+                        name = prompt_data["name"]
+                        content = prompt_data["content"]
+                        description = prompt_data.get("description", "")
+                        tags = prompt_data.get("tags", [])
+                        owner = prompt_data.get("owner")
+
+                        # Check if prompt exists
+                        cursor.execute(
+                            f"SELECT id FROM {self._table('prompts')} WHERE name = %s",
+                            (name,),
+                        )
+                        row = cursor.fetchone()
+
+                        if row is None:
+                            # Create new prompt
+                            prompt_id = str(uuid.uuid4())
+                            cursor.execute(
+                                f"INSERT INTO {self._table('prompts')} (id, name, content, version) VALUES (%s, %s, %s, %s)",
+                                (prompt_id, name, content, 1),
+                            )
+                        else:
+                            prompt_id = row[0]
+                            # Update existing prompt
+                            cursor.execute(
+                                f"UPDATE {self._table('prompts')} SET content = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                                (content, prompt_id),
+                            )
+
+                        # Update or create registry entry
+                        cursor.execute(
+                            f"SELECT id FROM {self._table('prompt_registry')} WHERE prompt_id = %s",
+                            (prompt_id,),
+                        )
+                        if cursor.fetchone() is None:
+                            cursor.execute(
+                                f"INSERT INTO {self._table('prompt_registry')} (id, prompt_id, description, owner) VALUES (%s, %s, %s, %s)",
+                                (str(uuid.uuid4()), prompt_id, description, owner),
+                            )
+                        else:
+                            cursor.execute(
+                                f"UPDATE {self._table('prompt_registry')} SET description = %s, owner = %s WHERE prompt_id = %s",
+                                (description, owner, prompt_id),
+                            )
+
+                        # Delete existing tags and add new ones
+                        cursor.execute(
+                            f"DELETE FROM {self._table('prompt_tags')} WHERE prompt_id = %s",
+                            (prompt_id,),
+                        )
+                        for tag in tags:
+                            cursor.execute(
+                                f"INSERT INTO {self._table('prompt_tags')} (prompt_id, tag) VALUES (%s, %s)",
+                                (prompt_id, tag),
+                            )
+
+                        saved_count += 1
+
+                    except Exception as e:
+                        logger.error(f"Error saving prompt {prompt_data.get('name', 'unknown')}: {e}")
+                        # Continue with next prompt instead of failing entire batch
+
+                # Commit all changes at once
+                cursor.connection.commit()
+
+            except Exception as e:
+                cursor.connection.rollback()
+                logger.error(f"Error in batch save: {e}")
+                raise
+
+        self.refresh()
+        self._emit("prompt_saved")
+        return saved_count
+
     # Variable Sets Management Methods
 
     def create_variable_set(self, name: str, variables: Optional[Dict[str, str]] = None, owner: Optional[str] = None) -> str:
