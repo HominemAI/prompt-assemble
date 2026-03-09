@@ -75,7 +75,8 @@ class TestFileSystemSourcePromptLoading:
 
         source = FileSystemSource(temp_dir)
         names = sorted(source.list())
-        assert names == ["personas_expert", "task"]
+        # Names are just filenames without directory paths
+        assert names == ["expert", "task"]
 
     def test_get_raw_nonexistent(self, temp_dir):
         """Test getting nonexistent prompt."""
@@ -101,7 +102,8 @@ class TestFileSystemSourceNameBuilding:
         (subdir / "prompt.prompt").write_text("content")
 
         source = FileSystemSource(temp_dir)
-        assert "level1_level2_prompt" in source.list()
+        # Names are just filenames without directory paths
+        assert "prompt" in source.list()
 
     def test_name_with_hyphens_and_spaces(self, temp_dir):
         """Test name building with hyphens and spaces."""
@@ -110,7 +112,8 @@ class TestFileSystemSourceNameBuilding:
         (subdir / "my-file.prompt").write_text("content")
 
         source = FileSystemSource(temp_dir)
-        assert "my_dir_my_file" in source.list()
+        # Names are just filenames without directory paths; hyphens preserved
+        assert "my-file" in source.list()
 
 
 class TestFileSystemSourceRegistry:
@@ -161,7 +164,8 @@ class TestFileSystemSourceRegistry:
         )
 
         source = FileSystemSource(temp_dir)
-        assert source.find_by_tag("persona") == ["personas_expert"]
+        # Names are just filenames without directory paths
+        assert source.find_by_tag("persona") == ["expert"]
 
     def test_orphaned_registry_entry_ignored(self, temp_dir):
         """Test that orphaned registry entries (no file) are silently ignored."""

@@ -39,6 +39,8 @@ def example_with_filesystem():
         )
 
     # Initialize the source
+    # Note: Prompt names are derived from filenames only, not directory paths.
+    # The file "personas/expert.prompt" is loaded as "expert", not "personas_expert"
     source = FileSystemSource(prompt_dir)
 
     print(f"✓ Loaded {len(source.list())} prompts from {prompt_dir}")
