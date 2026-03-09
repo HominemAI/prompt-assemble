@@ -61,7 +61,7 @@ class FileSystemSource(PromptSource):
                 stem = filename[:-7]  # Remove .prompt extension
 
                 try:
-                    # Build name from path
+                    # Get prompt name (filename without extension)
                     name = self._build_name(filepath)
 
                     # Read content
@@ -124,20 +124,13 @@ class FileSystemSource(PromptSource):
         return False
 
     def _build_name(self, filepath: Path) -> str:
-        """Build a prompt name from a file path."""
-        relative = filepath.relative_to(self.root)
-        parts = list(relative.parts[:-1])  # All but filename
-        stem = relative.stem  # Filename without extension
+        """Build a prompt name from a file path.
 
-        parts.append(stem)
-
-        # Convert to underscore-joined name
-        name_parts = []
-        for part in parts:
-            normalized = part.replace("-", "_").replace(" ", "_")
-            name_parts.append(normalized)
-
-        return "_".join(name_parts)
+        The name is simply the filename without the .prompt extension,
+        matching the UI's FileSystemBackend behavior. Directory structure
+        is tracked separately in the registry's filePath field.
+        """
+        return filepath.stem
 
     def _load_dir_registry(self, directory: Path) -> dict:
         """Load _registry.json from a directory."""

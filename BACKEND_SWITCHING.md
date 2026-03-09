@@ -76,19 +76,24 @@ my-prompts/
 ├── system_prompt.prompt           # Current prompt content
 ├── user_task.prompt
 ├── _registry.json                 # Metadata (tags, owner, description)
-├── _versions.json                 # Version history index
-├── .versions/                     # Version backup files
-│   ├── system_prompt.v1.prompt
-│   ├── system_prompt.v2.prompt
-│   └── user_task.v1.prompt
-├── .prompt-assemble/              # App configuration (browser-only)
-│   ├── variable-sets.json         # Stored variable sets
-│   └── subscriptions.json         # Prompt-level variable subscriptions
+├── .prompt-assemble/              # App configuration and metadata
+│   ├── versions/                  # Version history snapshots
+│   │   ├── system_prompt/
+│   │   │   ├── 1.json            # Version 1 snapshot
+│   │   │   ├── 2.json            # Version 2 snapshot
+│   │   │   └── ...
+│   │   ├── user_task/
+│   │   │   └── 1.json
+│   │   └── ...
+│   ├── variable_sets.json         # Stored variable sets
+│   ├── variable_set_selections.json # Active variable sets per prompt
+│   └── variable_set_overrides.json  # Variable overrides per prompt/set
 └── subfolder/
     ├── nested_prompt.prompt
-    ├── _registry.json
-    └── _versions.json
+    └── _registry.json
 ```
+
+**Note:** Prompt names are derived from filenames only. The file `subfolder/nested_prompt.prompt` is accessed as `nested_prompt`, not `subfolder_nested_prompt`. Directory structure is tracked in metadata but not part of the prompt name.
 
 **Important:**
 
