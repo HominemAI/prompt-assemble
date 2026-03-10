@@ -418,15 +418,30 @@ class FileSystemSource(PromptSource):
 
     # Variable Sets Management Methods
 
+    def _parse_variable_value(self, value: Any) -> tuple[str, Optional[str]]:
+        """
+        Parse a variable value (string or tagged dict) into (value_str, tag_str).
+
+        Args:
+            value: Either a string or a dict with 'value' and optional 'tag' keys
+
+        Returns:
+            Tuple of (value_string, tag_string_or_none)
+        """
+        if isinstance(value, dict) and "value" in value:
+            return str(value["value"]), value.get("tag")
+        return str(value), None
+
     def create_variable_set(
-        self, name: str, variables: Optional[Dict[str, str]] = None
+        self, name: str, variables: Optional[Dict[str, str]] = None, owner: Optional[str] = None
     ) -> str:
         """
         Create a new variable set.
 
         Args:
             name: Variable set name
-            variables: Dict of key-value pairs
+            variables: Dict of key-value pairs (simple strings or tagged dicts with 'value'/'tag' keys)
+            owner: Optional owner for scoped variable sets (None = global)
 
         Returns:
             Variable set ID
@@ -440,6 +455,7 @@ class FileSystemSource(PromptSource):
         sets[set_id] = {
             "id": set_id,
             "name": name,
+            "owner": owner,
             "variables": variables,
         }
 
@@ -461,6 +477,7 @@ class FileSystemSource(PromptSource):
         set_id: str,
         name: Optional[str] = None,
         variables: Optional[Dict[str, str]] = None,
+        owner: Optional[str] = None,
     ) -> None:
         """Update a variable set."""
         sets = self._load_json_store("variable_sets.json")
@@ -469,6 +486,8 @@ class FileSystemSource(PromptSource):
 
         if name:
             sets[set_id]["name"] = name
+        if owner is not None:
+            sets[set_id]["owner"] = owner
         if variables is not None:
             sets[set_id]["variables"] = variables
 
@@ -500,6 +519,106 @@ class FileSystemSource(PromptSource):
                 if not overrides[prompt_name]:
                     del overrides[prompt_name]
         self._save_json_store("variable_set_overrides.json", overrides)
+
+    def list_global_variable_sets(self) -> List[Dict[str, Any]]:
+        """List only global (unscoped) variable sets."""
+        sets = self._load_json_store("variable_sets.json")
+        global_sets = [s for s in sets.values() if s.get("owner") is None]
+        return sorted(global_sets, key=lambda x: x["name"])
+
+    def list_variable_sets_by_owner(self, owner: str) -> List[Dict[str, Any]]:
+        """List variable sets scoped to a specific owner."""
+        sets = self._load_json_store("variable_sets.json")
+        owner_sets = [s for s in sets.values() if s.get("owner") == owner]
+        return sorted(owner_sets, key=lambda x: x["name"])
+
+    def get_available_variable_sets(self, owner: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Get variable sets available to a prompt owner.
+        Returns global sets + sets scoped to the owner.
+        """
+        global_sets = self.list_global_variable_sets()
+        if owner:
+            owner_sets = self.list_variable_sets_by_owner(owner)
+            return global_sets + owner_sets
+        return global_sets
+
+    def add_variable_to_set(self, set_id: str, key: str, value: str, tag: Optional[str] = None) -> None:
+        """
+        Add or update a single variable in a set without modifying others.
+
+        Args:
+            set_id: Variable set ID
+            key: Variable key
+            value: Variable value (string or value part of tagged dict)
+            tag: Optional XML wrapper tag for the variable
+        """
+        sets = self._load_json_store("variable_sets.json")
+        if set_id not in sets:
+            return
+
+        # Ensure variables dict exists
+        if "variables" not in sets[set_id]:
+            sets[set_id]["variables"] = {}
+
+        # Store with tag if provided
+        if tag:
+            sets[set_id]["variables"][key] = {"value": value, "tag": tag}
+        else:
+            sets[set_id]["variables"][key] = value
+
+        self._save_json_store("variable_sets.json", sets)
+
+    def remove_variable_from_set(self, set_id: str, key: str) -> None:
+        """
+        Remove a single variable from a set.
+
+        Args:
+            set_id: Variable set ID
+            key: Variable key to remove
+        """
+        sets = self._load_json_store("variable_sets.json")
+        if set_id not in sets:
+            return
+
+        if "variables" in sets[set_id] and key in sets[set_id]["variables"]:
+            del sets[set_id]["variables"][key]
+            self._save_json_store("variable_sets.json", sets)
+
+    def find_variable_sets(self, name: Optional[str] = None, owner: Optional[str] = None,
+                          match_type: str = "exact") -> List[Dict[str, Any]]:
+        """
+        Find variable sets by name and/or owner.
+
+        Args:
+            name: Variable set name to search for (optional)
+            owner: Owner filter (optional)
+            match_type: "exact" or "partial" for name matching
+
+        Returns:
+            List of matching variable sets with their variables
+        """
+        sets = self._load_json_store("variable_sets.json")
+        results = []
+
+        for set_data in sets.values():
+            # Filter by name
+            if name is not None:
+                if match_type == "partial":
+                    if name.lower() not in set_data.get("name", "").lower():
+                        continue
+                else:
+                    if set_data.get("name") != name:
+                        continue
+
+            # Filter by owner
+            if owner is not None:
+                if set_data.get("owner") != owner:
+                    continue
+
+            results.append(set_data)
+
+        return sorted(results, key=lambda x: x["name"])
 
     def get_active_variable_sets(self, prompt_name: str) -> List[Dict[str, Any]]:
         """Get all active variable sets for a prompt, in order."""

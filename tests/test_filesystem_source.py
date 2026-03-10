@@ -517,3 +517,207 @@ class TestFileSystemSourceVariableOverrides:
 
         overrides = source.get_variable_overrides("test", set_id)
         assert overrides == {"y": "b"}
+
+
+class TestFileSystemSourceTaggedVariables:
+    """Test tagged variable functionality."""
+
+    def test_variable_tagged_format(self, temp_dir):
+        """Test creating and retrieving tagged variables."""
+        source = FileSystemSource(temp_dir)
+
+        # Create a set with a tagged variable
+        set_id = source.create_variable_set(
+            "tagged_set",
+            variables={"ROLE": {"value": "expert", "tag": "persona"}}
+        )
+
+        # Retrieve and verify
+        vs = source.get_variable_set(set_id)
+        assert "ROLE" in vs["variables"]
+        assert vs["variables"]["ROLE"]["value"] == "expert"
+        assert vs["variables"]["ROLE"]["tag"] == "persona"
+
+    def test_variable_mixed_format(self, temp_dir):
+        """Test set with both simple and tagged variables."""
+        source = FileSystemSource(temp_dir)
+
+        set_id = source.create_variable_set(
+            "mixed_set",
+            variables={
+                "NAME": "Alice",
+                "ROLE": {"value": "admin", "tag": "persona"},
+                "AGE": 30,
+            }
+        )
+
+        vs = source.get_variable_set(set_id)
+        assert vs["variables"]["NAME"] == "Alice"
+        assert vs["variables"]["ROLE"]["tag"] == "persona"
+        assert vs["variables"]["AGE"] == 30
+
+
+class TestFileSystemSourceGranularVariableOps:
+    """Test granular variable set operations."""
+
+    def test_add_variable_to_set(self, temp_dir):
+        """Test adding a variable to an existing set."""
+        source = FileSystemSource(temp_dir)
+        set_id = source.create_variable_set("test_set", variables={"KEY1": "value1"})
+
+        # Add a new variable
+        source.add_variable_to_set(set_id, "KEY2", "value2")
+
+        # Verify both exist
+        vs = source.get_variable_set(set_id)
+        assert vs["variables"]["KEY1"] == "value1"
+        assert vs["variables"]["KEY2"] == "value2"
+
+    def test_add_variable_with_tag(self, temp_dir):
+        """Test adding a tagged variable to a set."""
+        source = FileSystemSource(temp_dir)
+        set_id = source.create_variable_set("test_set")
+
+        # Add a tagged variable
+        source.add_variable_to_set(set_id, "ROLE", "admin", tag="persona")
+
+        # Verify
+        vs = source.get_variable_set(set_id)
+        assert vs["variables"]["ROLE"]["value"] == "admin"
+        assert vs["variables"]["ROLE"]["tag"] == "persona"
+
+    def test_add_variable_updates_existing(self, temp_dir):
+        """Test that add_variable_to_set updates existing variables."""
+        source = FileSystemSource(temp_dir)
+        set_id = source.create_variable_set("test_set", variables={"KEY": "old_value"})
+
+        # Update the variable
+        source.add_variable_to_set(set_id, "KEY", "new_value")
+
+        # Verify it was updated
+        vs = source.get_variable_set(set_id)
+        assert vs["variables"]["KEY"] == "new_value"
+
+    def test_remove_variable_from_set(self, temp_dir):
+        """Test removing a variable from a set."""
+        source = FileSystemSource(temp_dir)
+        set_id = source.create_variable_set(
+            "test_set", variables={"KEY1": "value1", "KEY2": "value2"}
+        )
+
+        # Remove one variable
+        source.remove_variable_from_set(set_id, "KEY1")
+
+        # Verify only KEY2 remains
+        vs = source.get_variable_set(set_id)
+        assert "KEY1" not in vs["variables"]
+        assert "KEY2" in vs["variables"]
+
+    def test_remove_nonexistent_variable(self, temp_dir):
+        """Test removing a nonexistent variable (should not error)."""
+        source = FileSystemSource(temp_dir)
+        set_id = source.create_variable_set("test_set", variables={"KEY": "value"})
+
+        # Remove a nonexistent variable
+        source.remove_variable_from_set(set_id, "NONEXISTENT")
+
+        # Original variable should still exist
+        vs = source.get_variable_set(set_id)
+        assert "KEY" in vs["variables"]
+
+
+class TestFileSystemSourceFindVariableSets:
+    """Test finding variable sets by name and owner."""
+
+    def test_find_variable_sets_exact_match(self, temp_dir):
+        """Test exact name matching."""
+        source = FileSystemSource(temp_dir)
+        source.create_variable_set("greeting_set", variables={})
+        source.create_variable_set("farewell_set", variables={})
+
+        results = source.find_variable_sets(name="greeting_set")
+        assert len(results) == 1
+        assert results[0]["name"] == "greeting_set"
+
+    def test_find_variable_sets_partial_match(self, temp_dir):
+        """Test partial name matching."""
+        source = FileSystemSource(temp_dir)
+        source.create_variable_set("greeting_set", variables={})
+        source.create_variable_set("greeting_formal", variables={})
+        source.create_variable_set("farewell_set", variables={})
+
+        results = source.find_variable_sets(name="greeting", match_type="partial")
+        assert len(results) == 2
+        names = {r["name"] for r in results}
+        assert names == {"greeting_set", "greeting_formal"}
+
+    def test_find_variable_sets_by_owner(self, temp_dir):
+        """Test finding sets by owner."""
+        source = FileSystemSource(temp_dir)
+        source.create_variable_set("alice_set", variables={}, owner="alice")
+        source.create_variable_set("bob_set", variables={}, owner="bob")
+        source.create_variable_set("global_set", variables={}, owner=None)
+
+        # Find by owner
+        alice_sets = source.find_variable_sets(owner="alice")
+        assert len(alice_sets) == 1
+        assert alice_sets[0]["name"] == "alice_set"
+
+        # Find by owner=bob
+        bob_sets = source.find_variable_sets(owner="bob")
+        assert len(bob_sets) == 1
+        assert bob_sets[0]["name"] == "bob_set"
+
+    def test_find_variable_sets_combined_filters(self, temp_dir):
+        """Test finding with both name and owner filters."""
+        source = FileSystemSource(temp_dir)
+        source.create_variable_set("greeting_alice", variables={}, owner="alice")
+        source.create_variable_set("greeting_bob", variables={}, owner="bob")
+        source.create_variable_set("farewell_alice", variables={}, owner="alice")
+
+        # Find greeting sets by alice
+        results = source.find_variable_sets(name="greeting", owner="alice", match_type="partial")
+        assert len(results) == 1
+        assert results[0]["name"] == "greeting_alice"
+
+    def test_list_global_variable_sets(self, temp_dir):
+        """Test listing only global (unscoped) variable sets."""
+        source = FileSystemSource(temp_dir)
+        source.create_variable_set("global1", variables={}, owner=None)
+        source.create_variable_set("global2", variables={}, owner=None)
+        source.create_variable_set("scoped", variables={}, owner="alice")
+
+        results = source.list_global_variable_sets()
+        assert len(results) == 2
+        names = {r["name"] for r in results}
+        assert names == {"global1", "global2"}
+
+    def test_list_variable_sets_by_owner(self, temp_dir):
+        """Test listing sets scoped to a specific owner."""
+        source = FileSystemSource(temp_dir)
+        source.create_variable_set("alice1", variables={}, owner="alice")
+        source.create_variable_set("alice2", variables={}, owner="alice")
+        source.create_variable_set("bob1", variables={}, owner="bob")
+
+        results = source.list_variable_sets_by_owner("alice")
+        assert len(results) == 2
+        names = {r["name"] for r in results}
+        assert names == {"alice1", "alice2"}
+
+    def test_get_available_variable_sets(self, temp_dir):
+        """Test getting available sets (global + scoped)."""
+        source = FileSystemSource(temp_dir)
+        source.create_variable_set("global", variables={}, owner=None)
+        source.create_variable_set("alice_scoped", variables={}, owner="alice")
+        source.create_variable_set("bob_scoped", variables={}, owner="bob")
+
+        # For alice: global + alice_scoped
+        results = source.get_available_variable_sets(owner="alice")
+        assert len(results) == 2
+        names = {r["name"] for r in results}
+        assert names == {"global", "alice_scoped"}
+
+        # No owner: just global
+        results = source.get_available_variable_sets(owner=None)
+        assert len(results) == 1
+        assert results[0]["name"] == "global"
