@@ -4,7 +4,7 @@ prompt-assemble: Lightweight prompt assembly with sigil-based substitution.
 A simple, logic-free way to build dynamic prompts using variable and component substitution.
 """
 
-__version__ = "0.3.5"
+__version__ = "0.3.6"
 __author__ = "Adam Sanchez"
 __email__ = "agentpython@proton.me"
 __license__ = "MIT"
