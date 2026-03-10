@@ -304,6 +304,7 @@ class DatabaseSource(PromptSource):
                                 variable_set_id TEXT NOT NULL,
                                 key TEXT NOT NULL,
                                 value TEXT NOT NULL,
+                                tag TEXT,
                                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                 UNIQUE(variable_set_id, key),
@@ -316,6 +317,16 @@ class DatabaseSource(PromptSource):
                         logger.warning(f"Could not create variable_set_variables table: {e}")
                 else:
                     logger.info(f"✓ Table {table_name} already exists")
+                    # Add tag column if it doesn't exist (for backwards compatibility)
+                    try:
+                        cursor.execute(
+                            f"ALTER TABLE {table_name} ADD COLUMN tag TEXT"
+                        )
+                        logger.info(f"Added tag column to {table_name}")
+                    except Exception as e:
+                        # Silently ignore if column already exists
+                        if "already exists" not in str(e).lower() and "duplicate column" not in str(e).lower():
+                            logger.debug(f"Could not add tag column to {table_name}: {e}")
 
                 table_name = self._table('variable_set_selections')
                 if not self._table_exists(cursor, table_name):
@@ -818,13 +829,46 @@ class DatabaseSource(PromptSource):
 
     # Variable Sets Management Methods
 
+    def _parse_variable_value(self, value: Any) -> tuple[str, Optional[str]]:
+        """
+        Parse a variable value (string or tagged dict) into (value_str, tag_str).
+
+        Args:
+            value: Either a string or a dict with 'value' and optional 'tag' keys
+
+        Returns:
+            Tuple of (value_string, tag_string_or_none)
+        """
+        if isinstance(value, dict) and "value" in value:
+            return str(value["value"]), value.get("tag")
+        return str(value), None
+
+    def _get_set_variables(self, cursor: Any, set_id: str) -> Dict[str, Any]:
+        """
+        Get all variables for a set, handling both simple and tagged formats.
+
+        Returns:
+            Dict mapping keys to either simple strings or {"value": str, "tag": str}
+        """
+        cursor.execute(
+            f"SELECT key, value, tag FROM {self._table('variable_set_variables')} WHERE variable_set_id = %s",
+            (set_id,),
+        )
+        variables = {}
+        for key, value, tag in cursor.fetchall():
+            if tag:
+                variables[key] = {"value": value, "tag": tag}
+            else:
+                variables[key] = value
+        return variables
+
     def create_variable_set(self, name: str, variables: Optional[Dict[str, str]] = None, owner: Optional[str] = None) -> str:
         """
         Create a new variable set.
 
         Args:
             name: Variable set name
-            variables: Dict of key-value pairs
+            variables: Dict of key-value pairs (simple strings or tagged dicts with 'value'/'tag' keys)
             owner: Optional owner for scoped variable sets (None = global)
 
         Returns:
@@ -844,9 +888,10 @@ class DatabaseSource(PromptSource):
 
             # Add variables
             for key, value in variables.items():
+                val_str, tag = self._parse_variable_value(value)
                 cursor.execute(
-                    f"INSERT INTO {self._table('variable_set_variables')} (id, variable_set_id, key, value) VALUES (%s, %s, %s, %s)",
-                    (str(uuid.uuid4()), set_id, key, value),
+                    f"INSERT INTO {self._table('variable_set_variables')} (id, variable_set_id, key, value, tag) VALUES (%s, %s, %s, %s, %s)",
+                    (str(uuid.uuid4()), set_id, key, val_str, tag),
                 )
 
             cursor.connection.commit()
@@ -855,19 +900,14 @@ class DatabaseSource(PromptSource):
     def get_variable_set(self, set_id: str) -> Optional[Dict[str, Any]]:
         """Get a variable set by ID."""
         with self._get_cursor() as cursor:
-            cursor.execute(f"SELECT id, name FROM {self._table('variable_sets')} WHERE id = %s", (set_id,))
+            cursor.execute(f"SELECT id, name, owner FROM {self._table('variable_sets')} WHERE id = %s", (set_id,))
             row = cursor.fetchone()
             if not row:
                 return None
 
-            set_id, name = row
-            cursor.execute(
-                f"SELECT key, value FROM {self._table('variable_set_variables')} WHERE variable_set_id = %s",
-                (set_id,),
-            )
-
-            variables = {row[0]: row[1] for row in cursor.fetchall()}
-            return {"id": set_id, "name": name, "variables": variables}
+            set_id, name, owner = row
+            variables = self._get_set_variables(cursor, set_id)
+            return {"id": set_id, "name": name, "owner": owner, "variables": variables}
 
     def list_variable_sets(self) -> List[Dict[str, Any]]:
         """List all variable sets (global and all scoped)."""
@@ -876,11 +916,7 @@ class DatabaseSource(PromptSource):
             sets = []
             for row in cursor.fetchall():
                 set_id, name, owner = row
-                cursor.execute(
-                    f"SELECT key, value FROM {self._table('variable_set_variables')} WHERE variable_set_id = %s",
-                    (set_id,),
-                )
-                variables = {r[0]: r[1] for r in cursor.fetchall()}
+                variables = self._get_set_variables(cursor, set_id)
                 sets.append({"id": set_id, "name": name, "owner": owner, "variables": variables})
             return sets
 
@@ -891,11 +927,7 @@ class DatabaseSource(PromptSource):
             sets = []
             for row in cursor.fetchall():
                 set_id, name = row
-                cursor.execute(
-                    f"SELECT key, value FROM {self._table('variable_set_variables')} WHERE variable_set_id = %s",
-                    (set_id,),
-                )
-                variables = {r[0]: r[1] for r in cursor.fetchall()}
+                variables = self._get_set_variables(cursor, set_id)
                 sets.append({"id": set_id, "name": name, "owner": None, "variables": variables})
             return sets
 
@@ -906,11 +938,7 @@ class DatabaseSource(PromptSource):
             sets = []
             for row in cursor.fetchall():
                 set_id, name = row
-                cursor.execute(
-                    f"SELECT key, value FROM {self._table('variable_set_variables')} WHERE variable_set_id = %s",
-                    (set_id,),
-                )
-                variables = {r[0]: r[1] for r in cursor.fetchall()}
+                variables = self._get_set_variables(cursor, set_id)
                 sets.append({"id": set_id, "name": name, "owner": owner, "variables": variables})
             return sets
 
@@ -958,9 +986,10 @@ class DatabaseSource(PromptSource):
                 )
                 # Add new variables
                 for key, value in variables.items():
+                    val_str, tag = self._parse_variable_value(value)
                     cursor.execute(
-                        f"INSERT INTO {self._table('variable_set_variables')} (id, variable_set_id, key, value) VALUES (%s, %s, %s, %s)",
-                        (str(uuid.uuid4()), set_id, key, value),
+                        f"INSERT INTO {self._table('variable_set_variables')} (id, variable_set_id, key, value, tag) VALUES (%s, %s, %s, %s, %s)",
+                        (str(uuid.uuid4()), set_id, key, val_str, tag),
                     )
 
             cursor.connection.commit()
@@ -1004,11 +1033,7 @@ class DatabaseSource(PromptSource):
             sets = []
             for row in cursor.fetchall():
                 set_id, name = row
-                cursor.execute(
-                    f"SELECT key, value FROM {self._table('variable_set_variables')} WHERE variable_set_id = %s",
-                    (set_id,),
-                )
-                variables = {r[0]: r[1] for r in cursor.fetchall()}
+                variables = self._get_set_variables(cursor, set_id)
                 sets.append({"id": set_id, "name": name, "variables": variables})
             return sets
 
@@ -1028,6 +1053,106 @@ class DatabaseSource(PromptSource):
                     (str(uuid.uuid4()), prompt_id, set_id, order),
                 )
             cursor.connection.commit()
+
+    def add_variable_to_set(self, set_id: str, key: str, value: str, tag: Optional[str] = None) -> None:
+        """
+        Add or update a single variable in a set without modifying others.
+
+        Args:
+            set_id: Variable set ID
+            key: Variable key
+            value: Variable value (string or value part of tagged dict)
+            tag: Optional XML wrapper tag for the variable
+        """
+        import uuid
+        self._ensure_connection()
+        with self._get_cursor() as cursor:
+            # Try insert first (if key doesn't exist)
+            cursor.execute(
+                f"SELECT id FROM {self._table('variable_set_variables')} WHERE variable_set_id = %s AND key = %s",
+                (set_id, key),
+            )
+            existing = cursor.fetchone()
+
+            if existing:
+                # Update existing
+                cursor.execute(
+                    f"UPDATE {self._table('variable_set_variables')} SET value = %s, tag = %s, updated_at = CURRENT_TIMESTAMP WHERE variable_set_id = %s AND key = %s",
+                    (value, tag, set_id, key),
+                )
+            else:
+                # Insert new
+                cursor.execute(
+                    f"INSERT INTO {self._table('variable_set_variables')} (id, variable_set_id, key, value, tag) VALUES (%s, %s, %s, %s, %s)",
+                    (str(uuid.uuid4()), set_id, key, value, tag),
+                )
+
+            cursor.connection.commit()
+
+    def remove_variable_from_set(self, set_id: str, key: str) -> None:
+        """
+        Remove a single variable from a set.
+
+        Args:
+            set_id: Variable set ID
+            key: Variable key to remove
+        """
+        self._ensure_connection()
+        with self._get_cursor() as cursor:
+            cursor.execute(
+                f"DELETE FROM {self._table('variable_set_variables')} WHERE variable_set_id = %s AND key = %s",
+                (set_id, key),
+            )
+            cursor.connection.commit()
+
+    def find_variable_sets(self, name: Optional[str] = None, owner: Optional[str] = None,
+                          match_type: str = "exact") -> List[Dict[str, Any]]:
+        """
+        Find variable sets by name and/or owner.
+
+        Args:
+            name: Variable set name to search for (optional)
+            owner: Owner filter (optional)
+            match_type: "exact" or "partial" for name matching
+
+        Returns:
+            List of matching variable sets with their variables
+        """
+        with self._get_cursor() as cursor:
+            # Build WHERE clause
+            conditions = []
+            params = []
+
+            if name is not None:
+                if match_type == "partial":
+                    conditions.append("name ILIKE %s")
+                    params.append(f"%{name}%")
+                else:
+                    conditions.append("name = %s")
+                    params.append(name)
+
+            if owner is not None:
+                conditions.append("owner = %s")
+                params.append(owner)
+
+            where_clause = " AND ".join(conditions) if conditions else "1=1"
+
+            cursor.execute(
+                f"SELECT id, name, owner FROM {self._table('variable_sets')} WHERE {where_clause} ORDER BY name",
+                params,
+            )
+
+            sets = []
+            for row in cursor.fetchall():
+                set_id, set_name, set_owner = row
+                variables = self._get_set_variables(cursor, set_id)
+                sets.append({
+                    "id": set_id,
+                    "name": set_name,
+                    "owner": set_owner,
+                    "variables": variables,
+                })
+            return sets
 
     def get_variable_overrides(self, prompt_id: str, set_id: str) -> Dict[str, str]:
         """Get override values for a specific set in a prompt."""

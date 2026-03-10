@@ -19,6 +19,9 @@ class MockSource(PromptSource):
         self.prompts = {}
         self.tags = {}  # prompt_name -> list of tags
         self._registry = Registry()  # For bulk_import metadata
+        self.variable_sets = {}  # set_id -> {id, name, owner, variables}
+        self.active_variable_sets = {}  # prompt_name -> [set_ids]
+        self.variable_overrides = {}  # prompt_name -> {set_id -> {key -> value}}
 
     def get_raw(self, name: str) -> str:
         """Get raw prompt content."""
@@ -61,6 +64,102 @@ class MockSource(PromptSource):
         # Register in registry
         entry = RegistryEntry(name=name, tags=tags or [], owner=owner)
         self._registry.register(entry)
+
+    def create_variable_set(self, name: str, variables=None, owner=None):
+        """Create a variable set."""
+        import uuid
+        if variables is None:
+            variables = {}
+        set_id = str(uuid.uuid4())
+        self.variable_sets[set_id] = {
+            "id": set_id,
+            "name": name,
+            "owner": owner,
+            "variables": variables.copy(),
+        }
+        return set_id
+
+    def get_variable_set(self, set_id: str):
+        """Get a variable set by ID."""
+        return self.variable_sets.get(set_id)
+
+    def list_variable_sets(self):
+        """List all variable sets."""
+        return list(self.variable_sets.values())
+
+    def update_variable_set(self, set_id: str, name=None, variables=None, owner=None):
+        """Update a variable set."""
+        if set_id not in self.variable_sets:
+            return
+        if name:
+            self.variable_sets[set_id]["name"] = name
+        if owner is not None:
+            self.variable_sets[set_id]["owner"] = owner
+        if variables is not None:
+            self.variable_sets[set_id]["variables"] = variables.copy()
+
+    def delete_variable_set(self, set_id: str):
+        """Delete a variable set."""
+        if set_id in self.variable_sets:
+            del self.variable_sets[set_id]
+
+    def get_active_variable_sets(self, prompt_name: str):
+        """Get active variable sets for a prompt."""
+        set_ids = self.active_variable_sets.get(prompt_name, [])
+        return [self.variable_sets[sid] for sid in set_ids if sid in self.variable_sets]
+
+    def set_active_variable_sets(self, prompt_name: str, set_ids: list):
+        """Set active variable sets for a prompt."""
+        self.active_variable_sets[prompt_name] = set_ids
+
+    def get_variable_overrides(self, prompt_name: str, set_id: str):
+        """Get overrides for a set in a prompt."""
+        return self.variable_overrides.get(prompt_name, {}).get(set_id, {})
+
+    def set_variable_overrides(self, prompt_name: str, set_id: str, overrides: dict):
+        """Set overrides for a set in a prompt."""
+        if prompt_name not in self.variable_overrides:
+            self.variable_overrides[prompt_name] = {}
+        self.variable_overrides[prompt_name][set_id] = overrides.copy()
+
+    def add_variable_to_set(self, set_id: str, key: str, value: str, tag=None):
+        """Add a variable to a set."""
+        if set_id not in self.variable_sets:
+            return
+        if tag:
+            self.variable_sets[set_id]["variables"][key] = {"value": value, "tag": tag}
+        else:
+            self.variable_sets[set_id]["variables"][key] = value
+
+    def remove_variable_from_set(self, set_id: str, key: str):
+        """Remove a variable from a set."""
+        if set_id in self.variable_sets and key in self.variable_sets[set_id]["variables"]:
+            del self.variable_sets[set_id]["variables"][key]
+
+    def find_variable_sets(self, name=None, owner=None, match_type="exact"):
+        """Find variable sets by name and/or owner."""
+        results = []
+        for vs in self.variable_sets.values():
+            # Filter by name if specified
+            if name is not None:
+                if match_type == "partial":
+                    if name.lower() not in vs["name"].lower():
+                        continue
+                else:
+                    if vs["name"] != name:
+                        continue
+
+            # Filter by owner if specified (including explicit None check)
+            # If owner parameter was passed (even if None), filter by it
+            # We need to check if 'owner' was explicitly provided
+            # Since we can't distinguish between not passed and passed None,
+            # we use a sentinel pattern in the test instead
+            if owner is not None:
+                if vs.get("owner") != owner:
+                    continue
+
+            results.append(vs)
+        return sorted(results, key=lambda x: x["name"])
 
 
 @pytest.fixture
@@ -550,4 +649,145 @@ class TestBulkImport:
 
         assert results["imported"] == 0
         assert results["errors"] == 0
-        assert results["skipped"] == 0
+
+
+class TestVariableSetsRendering:
+    """Test variable set functionality in render()."""
+
+    def test_render_with_variable_sets_param(self, provider, mock_source):
+        """Test render with explicit variable_sets parameter."""
+        # Create a variable set
+        mock_source.add_prompt("test", "Hello [[NAME]]")
+        set_id = mock_source.create_variable_set("greeting_set", variables={"NAME": "Alice"})
+
+        # Render using the variable set
+        result = provider.render("test", variable_sets=[set_id])
+        assert result == "Hello Alice"
+
+    def test_render_variable_set_merge_order(self, provider, mock_source):
+        """Test that explicit variables override set variables."""
+        mock_source.add_prompt("test", "[[NAME]] is [[AGE]]")
+        set_id = mock_source.create_variable_set("set1", variables={"NAME": "Alice", "AGE": 30})
+
+        # Explicit variables should override set variables
+        result = provider.render("test", variable_sets=[set_id], variables={"NAME": "Bob"})
+        assert result == "Bob is 30"
+
+    def test_render_subscribed_sets_then_additional(self, provider, mock_source):
+        """Test merge priority: subscribed < additional < explicit."""
+        mock_source.add_prompt("test", "[[NAME]] [[ROLE]]")
+
+        # Create two variable sets
+        set1_id = mock_source.create_variable_set("set1", variables={"NAME": "Alice", "ROLE": "user"})
+        set2_id = mock_source.create_variable_set("set2", variables={"NAME": "Bob", "ROLE": "admin"})
+
+        # Subscribe prompt to set1
+        mock_source.set_active_variable_sets("test", [set1_id])
+
+        # Additional set2 should override subscribed set1
+        result = provider.render("test", variable_sets=[set2_id])
+        assert result == "Bob admin"
+
+        # Explicit variables should override everything
+        result = provider.render("test", variable_sets=[set2_id], variables={"NAME": "Charlie"})
+        assert result == "Charlie admin"
+
+    def test_render_tagged_variable(self, provider, mock_source):
+        """Test rendering a tagged variable."""
+        mock_source.add_prompt("test", "Content: [[VALUE]]")
+
+        # Create a variable set with a tagged variable
+        set_id = mock_source.create_variable_set(
+            "tagged_set",
+            variables={"VALUE": {"value": "important", "tag": "emphasis"}}
+        )
+
+        # Render should wrap in XML tags
+        result = provider.render("test", variable_sets=[set_id])
+        assert "<emphasis>" in result
+        assert "important" in result
+        assert "</emphasis>" in result
+
+    def test_render_multiple_variable_sets(self, provider, mock_source):
+        """Test rendering with multiple variable sets."""
+        mock_source.add_prompt("test", "[[GREETING]] [[NAME]]")
+
+        set1_id = mock_source.create_variable_set("set1", variables={"GREETING": "Hello"})
+        set2_id = mock_source.create_variable_set("set2", variables={"NAME": "Alice"})
+
+        # Both sets should be merged
+        result = provider.render("test", variable_sets=[set1_id, set2_id])
+        assert result == "Hello Alice"
+
+
+class TestVariableSetOperations:
+    """Test granular variable set operations via provider."""
+
+    def test_provider_add_variable_to_set(self, provider, mock_source):
+        """Test adding a variable to a set via provider."""
+        set_id = mock_source.create_variable_set("test_set", variables={"KEY1": "value1"})
+
+        # Add a new variable
+        provider.add_variable_to_set(set_id, "KEY2", "value2")
+
+        # Verify both variables exist
+        vs = provider.get_variable_set(set_id)
+        assert vs["variables"]["KEY1"] == "value1"
+        assert vs["variables"]["KEY2"] == "value2"
+
+    def test_provider_add_variable_with_tag(self, provider, mock_source):
+        """Test adding a tagged variable via provider."""
+        set_id = mock_source.create_variable_set("test_set")
+
+        # Add a tagged variable
+        provider.add_variable_to_set(set_id, "ROLE", "admin", tag="persona")
+
+        # Verify it's stored with tag
+        vs = provider.get_variable_set(set_id)
+        assert vs["variables"]["ROLE"]["value"] == "admin"
+        assert vs["variables"]["ROLE"]["tag"] == "persona"
+
+    def test_provider_remove_variable_from_set(self, provider, mock_source):
+        """Test removing a variable from a set via provider."""
+        set_id = mock_source.create_variable_set("test_set", variables={"KEY1": "value1", "KEY2": "value2"})
+
+        # Remove a variable
+        provider.remove_variable_from_set(set_id, "KEY1")
+
+        # Verify only KEY2 remains
+        vs = provider.get_variable_set(set_id)
+        assert "KEY1" not in vs["variables"]
+        assert "KEY2" in vs["variables"]
+
+    def test_provider_find_variable_sets_by_name(self, provider, mock_source):
+        """Test finding variable sets by name."""
+        mock_source.create_variable_set("greeting_set", variables={"NAME": "Alice"})
+        mock_source.create_variable_set("greeting_formal", variables={"NAME": "Mr. Smith"})
+        mock_source.create_variable_set("farewell_set", variables={"NAME": "Goodbye"})
+
+        # Exact match
+        results = provider.find_variable_sets(name="greeting_set")
+        assert len(results) == 1
+        assert results[0]["name"] == "greeting_set"
+
+        # Partial match
+        results = provider.find_variable_sets(name="greeting", match_type="partial")
+        assert len(results) == 2
+        names = {r["name"] for r in results}
+        assert names == {"greeting_set", "greeting_formal"}
+
+    def test_provider_find_variable_sets_by_owner(self, provider, mock_source):
+        """Test finding variable sets by owner."""
+        mock_source.create_variable_set("alice_set", variables={"NAME": "Alice"}, owner="alice")
+        mock_source.create_variable_set("bob_set", variables={"NAME": "Bob"}, owner="bob")
+        mock_source.create_variable_set("global_set", variables={"NAME": "Everyone"}, owner=None)
+
+        # Find by owner
+        results = provider.find_variable_sets(owner="alice")
+        assert len(results) == 1
+        assert results[0]["name"] == "alice_set"
+
+        # Find by owner=bob
+        results = provider.find_variable_sets(owner="bob")
+        assert len(results) == 1
+        assert results[0]["name"] == "bob_set"

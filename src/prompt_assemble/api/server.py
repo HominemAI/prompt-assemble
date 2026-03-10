@@ -614,26 +614,32 @@ def create_app(source=None, config=None):
                 table_name = f"{table_prefix}variable_sets" if table_prefix else "variable_sets"
                 var_table_name = f"{table_prefix}variable_set_variables" if table_prefix else "variable_set_variables"
 
-                cursor.execute(f"SELECT id, name, updated_at FROM {table_name} ORDER BY updated_at DESC")
+                cursor.execute(f"SELECT id, name, owner, updated_at FROM {table_name} ORDER BY updated_at DESC")
                 rows = cursor.fetchall()
 
                 variable_sets = []
                 for row in rows:
                     set_id = row[0]
                     set_name = row[1]
+                    set_owner = row[2]
 
                     # Fetch variables for this set
                     cursor.execute(
-                        f"SELECT key, value FROM {var_table_name} WHERE variable_set_id = %s ORDER BY key",
+                        f"SELECT key, value, tag FROM {var_table_name} WHERE variable_set_id = %s ORDER BY key",
                         (set_id,)
                     )
                     variables = {}
                     for var_row in cursor.fetchall():
-                        variables[var_row[0]] = var_row[1]
+                        key, value, tag = var_row
+                        if tag:
+                            variables[key] = {"value": value, "tag": tag}
+                        else:
+                            variables[key] = value
 
                     variable_sets.append({
                         "id": set_id,
                         "name": set_name,
+                        "owner": set_owner,
                         "variables": variables
                     })
 
@@ -668,6 +674,7 @@ def create_app(source=None, config=None):
             data = request.json
             set_id = data.get('id')
             set_name = data.get('name')
+            owner = data.get('owner')
             variables = data.get('variables', {})
 
             if not set_id or not set_name:
@@ -684,16 +691,16 @@ def create_app(source=None, config=None):
                 exists = cursor.fetchone() is not None
 
                 if exists:
-                    # Update existing set name
+                    # Update existing set name and owner
                     cursor.execute(
-                        f"UPDATE {vs_table} SET name = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
-                        (set_name, set_id)
+                        f"UPDATE {vs_table} SET name = %s, owner = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                        (set_name, owner, set_id)
                     )
                 else:
                     # Insert new set
                     cursor.execute(
-                        f"INSERT INTO {vs_table} (id, name) VALUES (%s, %s)",
-                        (set_id, set_name)
+                        f"INSERT INTO {vs_table} (id, name, owner) VALUES (%s, %s, %s)",
+                        (set_id, set_name, owner)
                     )
 
                 # Clear existing variables and insert new ones
@@ -701,13 +708,21 @@ def create_app(source=None, config=None):
 
                 for key, value in variables.items():
                     var_id = f"{set_id}-{key}"
+                    # Handle both simple strings and tagged dicts
+                    if isinstance(value, dict) and "value" in value:
+                        val = value["value"]
+                        tag = value.get("tag")
+                    else:
+                        val = str(value)
+                        tag = None
+
                     cursor.execute(
-                        f"INSERT INTO {vsv_table} (id, variable_set_id, key, value) VALUES (%s, %s, %s, %s)",
-                        (var_id, set_id, key, value)
+                        f"INSERT INTO {vsv_table} (id, variable_set_id, key, value, tag) VALUES (%s, %s, %s, %s, %s)",
+                        (var_id, set_id, key, val, tag)
                     )
 
                 connection.commit()
-                return jsonify({"id": set_id, "name": set_name, "variables": variables}), 201
+                return jsonify({"id": set_id, "name": set_name, "owner": owner, "variables": variables}), 201
 
             except Exception as query_error:
                 try:
@@ -763,6 +778,344 @@ def create_app(source=None, config=None):
                     cursor.close()
                 except Exception as e:
                     logger.debug(f"Error closing cursor: {e}")
+
+    @app.route("/api/variable-sets/<set_id>", methods=["GET"])
+    def get_variable_set(set_id):
+        """Get a single variable set by ID."""
+        cursor = None
+        try:
+            if not hasattr(app.prompt_source, 'connection'):
+                return jsonify({"error": "Database not available"}), 500
+
+            connection = app.prompt_source.connection
+            cursor = connection.cursor()
+            table_prefix = getattr(app.prompt_source, 'table_prefix', '')
+            vs_table = f"{table_prefix}variable_sets" if table_prefix else "variable_sets"
+            vsv_table = f"{table_prefix}variable_set_variables" if table_prefix else "variable_set_variables"
+
+            try:
+                # Get the set
+                cursor.execute(f"SELECT id, name, owner FROM {vs_table} WHERE id = %s", (set_id,))
+                row = cursor.fetchone()
+                if not row:
+                    return jsonify({"error": "Variable set not found"}), 404
+
+                set_id, name, owner = row
+
+                # Get variables
+                cursor.execute(
+                    f"SELECT key, value, tag FROM {vsv_table} WHERE variable_set_id = %s ORDER BY key",
+                    (set_id,)
+                )
+                variables = {}
+                for var_row in cursor.fetchall():
+                    key, value, tag = var_row
+                    if tag:
+                        variables[key] = {"value": value, "tag": tag}
+                    else:
+                        variables[key] = value
+
+                return jsonify({
+                    "id": set_id,
+                    "name": name,
+                    "owner": owner,
+                    "variables": variables
+                }), 200
+            except Exception as query_error:
+                logger.debug(f"Error getting variable set: {query_error}")
+                return jsonify({"error": str(query_error)}), 500
+        except Exception as e:
+            logger.error(f"Error getting variable set: {e}")
+            return jsonify({"error": str(e)}), 500
+        finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except:
+                    pass
+
+    @app.route("/api/variable-sets/<set_id>", methods=["PUT"])
+    def update_variable_set(set_id):
+        """Update a variable set."""
+        cursor = None
+        try:
+            if not hasattr(app.prompt_source, 'connection'):
+                return jsonify({"error": "Database not available"}), 500
+
+            connection = app.prompt_source.connection
+            data = request.json
+            name = data.get('name')
+            owner = data.get('owner')
+            variables = data.get('variables', {})
+
+            cursor = connection.cursor()
+            table_prefix = getattr(app.prompt_source, 'table_prefix', '')
+            vs_table = f"{table_prefix}variable_sets" if table_prefix else "variable_sets"
+            vsv_table = f"{table_prefix}variable_set_variables" if table_prefix else "variable_set_variables"
+
+            try:
+                # Update set metadata
+                if name or owner is not None:
+                    update_parts = []
+                    params = []
+                    if name:
+                        update_parts.append("name = %s")
+                        params.append(name)
+                    if owner is not None:
+                        update_parts.append("owner = %s")
+                        params.append(owner)
+                    update_parts.append("updated_at = CURRENT_TIMESTAMP")
+                    params.append(set_id)
+
+                    cursor.execute(
+                        f"UPDATE {vs_table} SET {', '.join(update_parts)} WHERE id = %s",
+                        params
+                    )
+
+                # Update variables if provided
+                if variables:
+                    # Clear and re-insert
+                    cursor.execute(f"DELETE FROM {vsv_table} WHERE variable_set_id = %s", (set_id,))
+
+                    for key, value in variables.items():
+                        if isinstance(value, dict) and "value" in value:
+                            val = value["value"]
+                            tag = value.get("tag")
+                        else:
+                            val = str(value)
+                            tag = None
+
+                        var_id = f"{set_id}-{key}"
+                        cursor.execute(
+                            f"INSERT INTO {vsv_table} (id, variable_set_id, key, value, tag) VALUES (%s, %s, %s, %s, %s)",
+                            (var_id, set_id, key, val, tag)
+                        )
+
+                connection.commit()
+                return jsonify({"id": set_id, "name": name, "owner": owner, "variables": variables}), 200
+            except Exception as query_error:
+                try:
+                    connection.rollback()
+                except:
+                    pass
+                logger.debug(f"Error updating variable set: {query_error}")
+                return jsonify({"error": str(query_error)}), 500
+        except Exception as e:
+            logger.error(f"Error updating variable set: {e}")
+            return jsonify({"error": str(e)}), 500
+        finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except:
+                    pass
+
+    @app.route("/api/variable-sets/<set_id>/variables", methods=["POST"])
+    def add_variable_to_set(set_id):
+        """Add or update a single variable in a set."""
+        cursor = None
+        try:
+            if not hasattr(app.prompt_source, 'connection'):
+                return jsonify({"error": "Database not available"}), 500
+
+            connection = app.prompt_source.connection
+            data = request.json
+            key = data.get('key')
+            value = data.get('value')
+            tag = data.get('tag')
+
+            if not key or value is None:
+                return jsonify({"error": "Missing key or value"}), 400
+
+            cursor = connection.cursor()
+            table_prefix = getattr(app.prompt_source, 'table_prefix', '')
+            vsv_table = f"{table_prefix}variable_set_variables" if table_prefix else "variable_set_variables"
+
+            try:
+                # Check if exists
+                cursor.execute(
+                    f"SELECT id FROM {vsv_table} WHERE variable_set_id = %s AND key = %s",
+                    (set_id, key)
+                )
+                exists = cursor.fetchone() is not None
+
+                if exists:
+                    # Update
+                    cursor.execute(
+                        f"UPDATE {vsv_table} SET value = %s, tag = %s, updated_at = CURRENT_TIMESTAMP WHERE variable_set_id = %s AND key = %s",
+                        (str(value), tag, set_id, key)
+                    )
+                else:
+                    # Insert
+                    var_id = f"{set_id}-{key}"
+                    cursor.execute(
+                        f"INSERT INTO {vsv_table} (id, variable_set_id, key, value, tag) VALUES (%s, %s, %s, %s, %s)",
+                        (var_id, set_id, key, str(value), tag)
+                    )
+
+                connection.commit()
+                return jsonify({"key": key, "value": value, "tag": tag}), 200
+            except Exception as query_error:
+                try:
+                    connection.rollback()
+                except:
+                    pass
+                logger.debug(f"Error adding variable: {query_error}")
+                return jsonify({"error": str(query_error)}), 500
+        except Exception as e:
+            logger.error(f"Error adding variable: {e}")
+            return jsonify({"error": str(e)}), 500
+        finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except:
+                    pass
+
+    @app.route("/api/variable-sets/<set_id>/variables/<key>", methods=["DELETE"])
+    def remove_variable_from_set(set_id, key):
+        """Remove a variable from a set."""
+        cursor = None
+        try:
+            if not hasattr(app.prompt_source, 'connection'):
+                return jsonify({"error": "Database not available"}), 500
+
+            connection = app.prompt_source.connection
+            cursor = connection.cursor()
+            table_prefix = getattr(app.prompt_source, 'table_prefix', '')
+            vsv_table = f"{table_prefix}variable_set_variables" if table_prefix else "variable_set_variables"
+
+            try:
+                cursor.execute(
+                    f"DELETE FROM {vsv_table} WHERE variable_set_id = %s AND key = %s",
+                    (set_id, key)
+                )
+                connection.commit()
+                return jsonify({"success": True}), 200
+            except Exception as query_error:
+                try:
+                    connection.rollback()
+                except:
+                    pass
+                logger.debug(f"Error removing variable: {query_error}")
+                return jsonify({"error": str(query_error)}), 500
+        except Exception as e:
+            logger.error(f"Error removing variable: {e}")
+            return jsonify({"error": str(e)}), 500
+        finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except:
+                    pass
+
+    @app.route("/api/variable-sets/find", methods=["POST"])
+    def find_variable_sets():
+        """Find variable sets by name and/or owner."""
+        cursor = None
+        try:
+            if not hasattr(app.prompt_source, 'connection'):
+                return jsonify({"variable_sets": []})
+
+            connection = app.prompt_source.connection
+            data = request.json
+            name = data.get('name')
+            owner = data.get('owner')
+            match_type = data.get('match_type', 'exact')
+
+            cursor = connection.cursor()
+            table_prefix = getattr(app.prompt_source, 'table_prefix', '')
+            vs_table = f"{table_prefix}variable_sets" if table_prefix else "variable_sets"
+            vsv_table = f"{table_prefix}variable_set_variables" if table_prefix else "variable_set_variables"
+
+            try:
+                # Build WHERE clause
+                conditions = []
+                params = []
+
+                if name:
+                    if match_type == "partial":
+                        conditions.append("name ILIKE %s")
+                        params.append(f"%{name}%")
+                    else:
+                        conditions.append("name = %s")
+                        params.append(name)
+
+                if owner is not None:
+                    conditions.append("owner = %s")
+                    params.append(owner)
+
+                where_clause = " AND ".join(conditions) if conditions else "1=1"
+
+                cursor.execute(f"SELECT id, name, owner FROM {vs_table} WHERE {where_clause} ORDER BY name", params)
+                rows = cursor.fetchall()
+
+                variable_sets = []
+                for row in rows:
+                    set_id, set_name, set_owner = row
+
+                    # Get variables
+                    cursor.execute(
+                        f"SELECT key, value, tag FROM {vsv_table} WHERE variable_set_id = %s ORDER BY key",
+                        (set_id,)
+                    )
+                    variables = {}
+                    for var_row in cursor.fetchall():
+                        key, value, tag = var_row
+                        if tag:
+                            variables[key] = {"value": value, "tag": tag}
+                        else:
+                            variables[key] = value
+
+                    variable_sets.append({
+                        "id": set_id,
+                        "name": set_name,
+                        "owner": set_owner,
+                        "variables": variables
+                    })
+
+                return jsonify({"variable_sets": variable_sets}), 200
+            except Exception as query_error:
+                logger.debug(f"Error finding variable sets: {query_error}")
+                return jsonify({"variable_sets": []}), 200
+        except Exception as e:
+            logger.error(f"Error finding variable sets: {e}")
+            return jsonify({"error": str(e)}), 500
+        finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except:
+                    pass
+
+    @app.route("/api/prompts/<name>/render", methods=["POST"])
+    def render_prompt(name):
+        """Render a prompt with variable substitution and variable sets."""
+        try:
+            if not app.prompt_source:
+                return jsonify({"error": "No prompt source configured"}), 500
+
+            from prompt_assemble import PromptProvider
+            provider = PromptProvider(app.prompt_source)
+
+            data = request.json
+            variables = data.get('variables', {})
+            variable_sets = data.get('variable_sets', [])
+            recursive = data.get('recursive', True)
+            max_depth = data.get('max_depth', 10)
+
+            result = provider.render(
+                name,
+                variables=variables,
+                variable_sets=variable_sets,
+                recursive=recursive,
+                max_depth=max_depth
+            )
+
+            return jsonify({"rendered": result}), 200
+        except Exception as e:
+            logger.error(f"Error rendering prompt: {e}")
+            return jsonify({"error": str(e)}), 500
 
     @app.route("/api/export", methods=["POST"])
     def export_prompts():

@@ -38,6 +38,64 @@ class PromptProvider:
         """
         return self.source.get_raw(name)
 
+    def _resolve_variable_value(self, value: Any) -> str:
+        """
+        Convert a variable value (string or tagged dict) to its rendered string.
+
+        Args:
+            value: Either a string or a dict with 'value' and optional 'tag' keys
+
+        Returns:
+            Rendered string (with XML tags if present)
+        """
+        if isinstance(value, dict) and "value" in value:
+            tag = value.get("tag")
+            val_str = str(value["value"])
+            if tag:
+                return f"<{tag}>\n  {val_str}\n</{tag}>"
+            return val_str
+        return str(value)
+
+    def _resolve_variable_sets(
+        self,
+        prompt_name: str,
+        additional_set_ids: Optional[List[str]] = None,
+    ) -> Dict[str, str]:
+        """
+        Build merged variables from variable sets.
+
+        Priority (lowest to highest):
+          1. Subscribed sets (in subscription order)
+          2. additional_set_ids (in given order)
+          3. Per-prompt per-set overrides (applied on top of each set)
+
+        Args:
+            prompt_name: Prompt name to get subscriptions for
+            additional_set_ids: Additional variable set IDs to include
+
+        Returns:
+            Merged variables dict with all values as strings
+        """
+        merged = {}
+
+        # 1. Load subscribed sets
+        for vs in self.get_active_variable_sets(prompt_name):
+            overrides = self.get_variable_overrides(prompt_name, vs["id"])
+            variables = {**vs["variables"], **overrides}
+            for key, value in variables.items():
+                merged[key] = self._resolve_variable_value(value)
+
+        # 2. Load additional sets
+        for set_id in (additional_set_ids or []):
+            vs = self.get_variable_set(set_id)
+            if vs:
+                overrides = self.get_variable_overrides(prompt_name, set_id)
+                variables = {**vs["variables"], **overrides}
+                for key, value in variables.items():
+                    merged[key] = self._resolve_variable_value(value)
+
+        return merged
+
     def render(
             self,
             name: str,
@@ -48,6 +106,7 @@ class PromptProvider:
             tags: Optional[List[str]] = None,
             match_type: str = "exact",
             empty_render: str = "",
+            variable_sets: Optional[List[str]] = None,
     ) -> str:
         """
         Load and render a prompt with variable substitution.
@@ -61,6 +120,7 @@ class PromptProvider:
             tags: Filter by tags (AND intersection, optional)
             match_type: "exact" (default) or "partial" for name matching
             empty_render: Default content to render if result is empty (default: "")
+            variable_sets: List of variable set IDs to include (merged with subscriptions, lower priority than explicit variables)
 
         Returns:
             Rendered prompt, or empty_render if result is empty
@@ -88,6 +148,9 @@ class PromptProvider:
 
             # With default content if empty
             render("prompt", variables={...}, empty_render="[No prompt found]")
+
+            # With variable sets
+            render("prompt", variable_sets=["set_id_1", "set_id_2"], variables={...})
         """
         # Resolve the actual prompt name using search if needed
         resolved_name = self._resolve_prompt_name(name, owner=owner, tags=tags, match_type=match_type)
@@ -95,10 +158,10 @@ class PromptProvider:
         # Get raw content
         raw = self.get_raw(resolved_name)
 
-        # Serialize all variables to strings
-        if variables is None:
-            variables = {}
-        str_vars = serialize_variables(variables)
+        # Build merged variables: variable_sets (if provided) + subscriptions < explicit variables (highest priority)
+        set_vars = self._resolve_variable_sets(resolved_name, variable_sets)
+        explicit_vars = serialize_variables(variables or {})
+        str_vars = {**set_vars, **explicit_vars}  # explicit vars always win
 
         # Build component resolver (loads prompts on demand)
         def _get_component(comp_name: str) -> str:
@@ -468,6 +531,59 @@ class PromptProvider:
                 f"{type(self.source).__name__} does not support variable sets"
             )
         self.source.set_variable_overrides(prompt_id, set_id, overrides)
+
+    def add_variable_to_set(self, set_id: str, key: str, value: str, tag: Optional[str] = None) -> None:
+        """
+        Add or update a single variable in a set without modifying others.
+
+        Args:
+            set_id: Variable set ID
+            key: Variable key
+            value: Variable value (string or value part of tagged dict)
+            tag: Optional XML wrapper tag for the variable
+
+        Raises:
+            ReadOnlySourceError: If source does not support variable sets
+        """
+        if not hasattr(self.source, "add_variable_to_set"):
+            raise ReadOnlySourceError(
+                f"{type(self.source).__name__} does not support variable sets"
+            )
+        self.source.add_variable_to_set(set_id, key, value, tag=tag)
+
+    def remove_variable_from_set(self, set_id: str, key: str) -> None:
+        """
+        Remove a single variable from a set.
+
+        Args:
+            set_id: Variable set ID
+            key: Variable key to remove
+
+        Raises:
+            ReadOnlySourceError: If source does not support variable sets
+        """
+        if not hasattr(self.source, "remove_variable_from_set"):
+            raise ReadOnlySourceError(
+                f"{type(self.source).__name__} does not support variable sets"
+            )
+        self.source.remove_variable_from_set(set_id, key)
+
+    def find_variable_sets(self, name: Optional[str] = None, owner: Optional[str] = None,
+                          match_type: str = "exact") -> List[Dict[str, Any]]:
+        """
+        Find variable sets by name and/or owner.
+
+        Args:
+            name: Variable set name to search for (optional)
+            owner: Owner filter (optional)
+            match_type: "exact" or "partial" for name matching
+
+        Returns:
+            List of matching variable sets with their variables
+        """
+        if not hasattr(self.source, "find_variable_sets"):
+            return []
+        return self.source.find_variable_sets(name=name, owner=owner, match_type=match_type)
 
 
 def bulk_import(

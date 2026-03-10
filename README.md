@@ -237,6 +237,128 @@ All metadata is preserved during bulk import:
 - ✅ Owner
 - ✅ Versioning (for database targets)
 
+## Variable Sets
+
+**Variable sets** allow you to manage reusable variable combinations and apply them across multiple prompts. Variables can optionally carry XML wrapper tags for structured output.
+
+### Creating and Using Variable Sets
+
+```python
+from prompt_assemble import PromptProvider
+from prompt_assemble.sources import FileSystemSource
+
+provider = PromptProvider(FileSystemSource('./prompts'))
+
+# Create a variable set
+set_id = provider.create_variable_set(
+    name="persona_expert",
+    variables={
+        "ROLE": "expert software architect",
+        "TONE": "technical and precise"
+    }
+)
+
+# Render a prompt with variable sets
+result = provider.render(
+    "my_prompt",
+    variable_sets=[set_id]  # Use variables from the set
+)
+```
+
+### Tagged Variables (XML Output)
+
+Variables can include optional XML wrapper tags:
+
+```python
+# Create a variable set with tagged variables
+set_id = provider.create_variable_set(
+    name="personas",
+    variables={
+        "ROLE": {"value": "expert", "tag": "persona"},
+        "DOMAIN": "Python development"
+    }
+)
+
+# The [[ROLE]] sigil renders as:
+# <persona>
+#   expert
+# </persona>
+```
+
+### Merge Priority
+
+When rendering, variables are merged in this order (later overrides earlier):
+1. **Subscribed variable sets** (sets linked to the prompt)
+2. **Additional variable sets** (passed via `variable_sets` param)
+3. **Per-prompt overrides** (specific to this prompt + set combination)
+4. **Explicit variables** (passed to `render()` - highest priority)
+
+```python
+# Create two sets
+set1 = provider.create_variable_set("set1", {"NAME": "Alice", "AGE": 30})
+set2 = provider.create_variable_set("set2", {"NAME": "Bob"})
+
+# Render with merge priority
+result = provider.render(
+    "prompt",
+    variable_sets=[set2],           # Additional set
+    variables={"NAME": "Charlie"}   # Explicit var wins
+)
+# Result uses NAME=Charlie, AGE=30 (from set2)
+```
+
+### Granular Variable Operations
+
+Add or remove individual variables without replacing the entire set:
+
+```python
+# Add a single variable (updates if exists)
+provider.add_variable_to_set(set_id, "TOPIC", "machine learning", tag="domain")
+
+# Remove a single variable
+provider.remove_variable_from_set(set_id, "TOPIC")
+```
+
+### Finding Variable Sets
+
+Discover variable sets by name, owner, or both:
+
+```python
+# Exact match
+sets = provider.find_variable_sets(name="persona_expert")
+
+# Partial match
+sets = provider.find_variable_sets(name="persona", match_type="partial")
+
+# By owner
+sets = provider.find_variable_sets(owner="alice")
+
+# Owner-scoped sets (global + owner's scoped sets)
+sets = provider.get_available_variable_sets(owner="alice")
+
+# List only global (unscoped) sets
+sets = provider.list_global_variable_sets()
+```
+
+### Subscriptions and Overrides
+
+Link variable sets to specific prompts and override values:
+
+```python
+# Subscribe a prompt to variable sets
+provider.set_active_variable_sets("my_prompt", [set1_id, set2_id])
+
+# Get subscribed sets
+active = provider.get_active_variable_sets("my_prompt")
+
+# Override specific variables for this prompt + set combination
+provider.set_variable_overrides(
+    "my_prompt",
+    set1_id,
+    {"NAME": "Custom Override"}
+)
+```
+
 ## Docker Deployment
 
 ### Unified Docker Image (Backend + Frontend)
