@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.5] - 2026-03-10
+
+### Added
+
+- **Tagged Variables**: Variables can now carry optional XML wrapper tags
+  - Format: `{"value": "expert", "tag": "persona"}` renders as `<persona>\n  expert\n</persona>`
+  - Backward compatible with simple strings: `{"KEY": "value"}` still works
+  - Tag resolution in `render()` via `_resolve_variable_value()` helper
+
+- **Variable Set Rendering**: `render()` now accepts `variable_sets` parameter
+  - Explicit variable set IDs passed to render with automatic merging
+  - Priority hierarchy: subscriptions < additional_sets < per-prompt_overrides < explicit_variables
+  - `_resolve_variable_sets()` helper implements merge logic with proper precedence
+
+- **Granular Variable Operations**:
+  - `add_variable_to_set(set_id, key, value, tag=None)` - Add/update single variable without full-swap
+  - `remove_variable_from_set(set_id, key)` - Remove single variable
+  - Both available in DatabaseSource, FileSystemSource, and PromptProvider
+
+- **Variable Set Discovery**:
+  - `find_variable_sets(name=None, owner=None, match_type="exact"|"partial")` - Search by name and/or owner
+  - Exact and partial name matching support
+  - Owner-scoped filtering for multi-tenant scenarios
+
+- **Owner Scoping for Variable Sets**:
+  - `list_global_variable_sets()` - Returns only sets with `owner=None`
+  - `list_variable_sets_by_owner(owner)` - Filter by owner
+  - `get_available_variable_sets(owner)` - Returns global + owner-scoped sets
+
+- **REST API Endpoints**:
+  - `GET /api/variable-sets/<id>` - Get specific variable set with full variables
+  - `PUT /api/variable-sets/<id>` - Update variable set (name, owner, variables)
+  - `POST /api/variable-sets/<id>/variables` - Add/update single variable with tag support
+  - `DELETE /api/variable-sets/<id>/variables/<key>` - Remove single variable
+  - `POST /api/variable-sets/find` - Find sets by name and/or owner
+  - `POST /api/prompts/<name>/render` - Render with `variable_sets` parameter
+
+- **Database Schema**:
+  - Added `tag TEXT` column to `variable_set_variables` table
+  - Auto-migration in `_ensure_schema()` handles existing databases gracefully
+
+### Changed
+
+- `PromptProvider` render signature now includes `variable_sets: Optional[List[str]] = None`
+- Variable set CRUD methods now support owner field (nullable)
+- FileSystemSource variable storage now uses JSON format for tagged variables
+
 ## [0.3.3] - 2026-03-09
 
 ### Fixed
