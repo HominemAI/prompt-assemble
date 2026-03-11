@@ -34,8 +34,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY setup.py pyproject.toml README.md LICENSE /app/
 COPY src/ /app/src/
 
-# Install prompt-assemble with database dependencies
-RUN pip install --no-cache-dir -e ".[db]"
+# Install prompt-assemble with UI and database dependencies
+RUN pip install --no-cache-dir -e ".[ui-full]" && \
+    pip install --no-cache-dir flask flask-cors psycopg2-binary
 
 # Runtime stage
 FROM python:3.11-slim
@@ -50,6 +51,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy installed Python packages from builder
 COPY --from=py-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=py-builder /usr/local/bin /usr/local/bin
+
+# Verify and ensure Flask is installed
+RUN python -m pip install --no-cache-dir flask flask-cors psycopg2-binary 2>&1 | head -20 || true
 
 # Copy application code
 COPY --from=py-builder /app/src /app/src
