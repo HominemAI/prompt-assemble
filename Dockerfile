@@ -32,8 +32,8 @@ COPY src/ /app/src/
 # Copy built frontend assets to static directory
 COPY --from=frontend-builder /frontend/static /app/src/prompt_assemble/api/static
 
-# Install prompt-assemble with database dependencies
-RUN pip install --no-cache-dir -e ".[db]"
+# Install prompt-assemble with UI and database dependencies
+RUN pip install --no-cache-dir -e ".[ui-full]"
 
 # Runtime stage
 FROM python:3.11-slim

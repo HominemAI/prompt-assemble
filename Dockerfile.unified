@@ -34,8 +34,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY setup.py pyproject.toml README.md LICENSE /app/
 COPY src/ /app/src/
 
-# Install prompt-assemble with database dependencies
-RUN pip install --no-cache-dir -e ".[db]"
+# Install prompt-assemble with UI and database dependencies
+RUN pip install --no-cache-dir -e ".[ui-full]"
 
 # Runtime stage
 FROM python:3.11-slim
