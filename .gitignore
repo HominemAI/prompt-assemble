@@ -139,7 +139,7 @@ node_modules/
 dist/
 .next/
 out/
-src/prompt_assemble/ui/static/
+src/prompt_assemble/api/static/
 frontend/static/
 
 # IDE

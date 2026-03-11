@@ -12,7 +12,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}📦 Step 1: Installing frontend dependencies...${NC}"
-cd src/prompt_assemble/ui/frontend
+cd src/prompt_assemble/api/frontend
 npm install
 
 echo -e "${BLUE}🏗️  Step 2: Building frontend with Vite...${NC}"
@@ -25,6 +25,6 @@ echo ""
 echo "To run the app, execute:"
 echo "  cd $PROJECT_ROOT"
 echo "  export PROMPT_ASSEMBLE_UI=true"
-echo "  python -m prompt_assemble.ui.server"
+echo "  python -m prompt_assemble.api.server"
 echo ""
 echo "Then visit: http://localhost:5000"
