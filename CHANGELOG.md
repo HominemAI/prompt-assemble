@@ -5,7 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.5] - 2026-03-10
+## [0.3.7] - 2026-03-10
+
+### Changed
+
+- **Undefined Variable Handling**: Undefined variables during substitution are now logged as warnings and replaced with empty strings instead of raising `ValueError`
+  - Improves resilience of prompt rendering when variables are missing
+  - Logged at WARNING level for debugging purposes
+  - Allows prompts to render gracefully even with incomplete variable sets
+
+## [0.3.6] - 2026-03-10
 
 ### Added
 

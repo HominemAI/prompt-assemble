@@ -119,10 +119,16 @@ class TestErrors:
     """Test error handling."""
 
     def test_undefined_variable(self):
-        """Test error on undefined variable."""
+        """Test undefined variable is logged and replaced with empty string."""
+        template = "Hello [[UNDEFINED]] world"
+        result = substitute(template)
+        assert result == "Hello  world"
+
+    def test_undefined_variable_only(self):
+        """Test undefined variable as sole content returns empty string."""
         template = "[[UNDEFINED]]"
-        with pytest.raises(ValueError, match="Undefined variable"):
-            substitute(template)
+        result = substitute(template)
+        assert result == ""
 
     def test_undefined_component(self):
         """Test error on undefined component."""

@@ -234,10 +234,10 @@ class TestPromptProviderRender:
             provider.render("nonexistent")
 
     def test_render_missing_variable(self, provider, mock_source):
-        """Test rendering with missing variable."""
-        mock_source.add_prompt("test", "[[NAME]]")
-        with pytest.raises(ValueError, match="Undefined variable"):
-            provider.render("test")
+        """Test rendering with missing variable logs and returns empty string."""
+        mock_source.add_prompt("test", "Hello [[NAME]]!")
+        result = provider.render("test")
+        assert result == "Hello !"
 
 
 class TestPromptProviderComponentInjection:
