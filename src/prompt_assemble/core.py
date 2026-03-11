@@ -96,9 +96,12 @@ def substitute(
         Text with all sigils replaced
 
     Raises:
-        ValueError: If sigil references undefined variable or component
+        ValueError: If sigil references undefined component
         SubstitutionError: If PROMPT_TAG sigil encountered without tag_resolver
         RecursionError: If substitution depth exceeds max_depth
+
+    Note:
+        Undefined variables are logged as warnings and replaced with empty strings
     """
     # Import here to avoid circular dependency
     from .exceptions import SubstitutionError
@@ -166,7 +169,8 @@ def substitute(
 
         # Simple variable substitution
         if content not in variables:
-            raise ValueError(f"Undefined variable: {content}")
+            logger.warning(f"Undefined variable: {content}")
+            return ""
         return str(variables[content])
 
     # Perform substitution with optional recursion
