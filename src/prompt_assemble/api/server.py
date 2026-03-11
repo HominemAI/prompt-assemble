@@ -596,71 +596,18 @@ def create_app(source=None, config=None):
     @app.route("/api/variable-sets", methods=["GET"])
     def list_variable_sets():
         """List all available variable sets."""
-        cursor = None
         try:
-            # Check if source is database-backed and has connection
-            if not hasattr(app.prompt_source, 'connection'):
-                # For file-based sources, return empty list
-                return jsonify({"variable_sets": []})
-
-            connection = app.prompt_source.connection
-
-            # Try to query variable sets - if tables don't exist, return empty list
-            try:
-                cursor = connection.cursor()
-
-                # Query all variable sets ordered by updated_at descending
-                table_prefix = getattr(app.prompt_source, 'table_prefix', '')
-                table_name = f"{table_prefix}variable_sets" if table_prefix else "variable_sets"
-                var_table_name = f"{table_prefix}variable_set_variables" if table_prefix else "variable_set_variables"
-
-                cursor.execute(f"SELECT id, name, owner, updated_at FROM {table_name} ORDER BY updated_at DESC")
-                rows = cursor.fetchall()
-
-                variable_sets = []
-                for row in rows:
-                    set_id = row[0]
-                    set_name = row[1]
-                    set_owner = row[2]
-
-                    # Fetch variables for this set
-                    cursor.execute(
-                        f"SELECT key, value, tag FROM {var_table_name} WHERE variable_set_id = %s ORDER BY key",
-                        (set_id,)
-                    )
-                    variables = {}
-                    for var_row in cursor.fetchall():
-                        key, value, tag = var_row
-                        if tag:
-                            variables[key] = {"value": value, "tag": tag}
-                        else:
-                            variables[key] = value
-
-                    variable_sets.append({
-                        "id": set_id,
-                        "name": set_name,
-                        "owner": set_owner,
-                        "variables": variables
-                    })
-
-                return jsonify({"variable_sets": variable_sets})
-            except Exception as query_error:
-                # If tables don't exist or query fails, reset transaction and return empty
-                try:
-                    connection.rollback()
-                except:
-                    pass
-                logger.debug(f"Variable sets not available: {query_error}")
+            # Use the Python library method which handles prefix correctly
+            if hasattr(app.prompt_source, 'list_variable_sets'):
+                sets = app.prompt_source.list_variable_sets()
+                return jsonify({"variable_sets": sets})
+            else:
+                # For file-based sources that don't support variable sets
+                logger.info(f"Variable sets not supported by source ({type(app.prompt_source).__name__})")
                 return jsonify({"variable_sets": []})
         except Exception as e:
             logger.error(f"Error listing variable sets: {e}")
             return jsonify({"error": str(e)}), 500
-        finally:
-            if cursor is not None:
-                try:
-                    cursor.close()
-                except Exception as e:
-                    logger.debug(f"Error closing cursor: {e}")
 
     @app.route("/api/variable-sets", methods=["POST"])
     def create_variable_set():
