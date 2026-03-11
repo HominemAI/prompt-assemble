@@ -33,7 +33,8 @@ COPY src/ /app/src/
 COPY --from=frontend-builder /frontend/static /app/src/prompt_assemble/api/static
 
 # Install prompt-assemble with UI and database dependencies
-RUN pip install --no-cache-dir -e ".[ui-full]"
+RUN pip install --no-cache-dir -e ".[ui-full]" && \
+    pip install --no-cache-dir flask flask-cors psycopg2-binary
 
 # Runtime stage
 FROM python:3.11-slim
@@ -48,6 +49,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy installed packages from builder
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Verify and ensure Flask is installed
+RUN python -m pip install --no-cache-dir flask flask-cors psycopg2-binary 2>&1 | head -20 || true
 
 # Copy application code
 COPY --from=builder /app/src /app/src
