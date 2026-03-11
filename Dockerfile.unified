@@ -78,4 +78,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # The server will serve both the API and the frontend static files
 # Database environment variables required: DB_HOSTNAME, DB_PORT, DB_USERNAME, DB_PASSWORD, DB_DATABASE
 # Optional: PROMPT_ASSEMBLE_TABLE_PREFIX for multi-tenancy
-CMD ["python", "-c", "from prompt_assemble.ui.server import run_server; from prompt_assemble.sources import create_database_source_from_env; run_server(source=create_database_source_from_env(), host='0.0.0.0', port=8000, debug=False)"]
+CMD ["python", "-c", "from prompt_assemble.api.server import run_server; from prompt_assemble.sources import create_database_source_from_env; run_server(source=create_database_source_from_env(), host='0.0.0.0', port=8000, debug=False)"]
