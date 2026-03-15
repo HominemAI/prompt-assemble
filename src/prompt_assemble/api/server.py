@@ -495,7 +495,7 @@ def create_app(source=None, config=None):
     @app.route("/api/prompts/<name>/history", methods=["GET"])
     def get_prompt_history(name):
         """Get version history for a prompt (max 20 revisions)."""
-        if not hasattr(app.prompt_source, 'connection'):
+        if not hasattr(app.prompt_source, 'connection') or app.prompt_source.connection is None:
             logger.debug(f"[get_prompt_history] No database connection for {name}")
             return jsonify({"versions": []}), 200
 

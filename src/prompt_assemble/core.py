@@ -69,6 +69,21 @@ def _strip_comments(text: str) -> str:
     return text
 
 
+def _remove_empty_xml_sections(text: str) -> str:
+    """
+    Remove empty XML sections where content is only whitespace.
+
+    Examples:
+        "<tag>   </tag>" -> ""
+        "<tag>\n\n</tag>" -> ""
+        "<tag>content</tag>" -> "<tag>content</tag>" (unchanged)
+    """
+    # Match opening and closing tags with only whitespace between them
+    # This pattern matches: <word>whitespace</word>
+    pattern = r'<(\w+)>\s*</\1>'
+    return re.sub(pattern, '', text)
+
+
 def substitute(
         text: str,
         variables: Optional[Dict[str, Any]] = None,
@@ -193,6 +208,9 @@ def substitute(
     else:
         # Max depth exceeded
         raise RecursionError(f"Substitution recursion exceeded max depth of {max_depth}")
+
+    # Remove empty XML sections
+    current_text = _remove_empty_xml_sections(current_text)
 
     return current_text
 
