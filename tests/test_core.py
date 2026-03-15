@@ -372,3 +372,172 @@ class TestPromptTagSigil:
         )
         # Should return both even though limit is higher
         assert result == "First\n\nSecond"
+
+
+class TestEmptyXMLSectionCleanup:
+    """Test removal of empty XML sections after rendering."""
+
+    def test_remove_empty_tag_with_spaces(self):
+        """Test removing XML tag with spaces inside."""
+        template = "<persona>   </persona>"
+        result = substitute(template, variables={})
+        assert result == ""
+
+    def test_remove_empty_tag_with_newlines(self):
+        """Test removing XML tag with newlines inside."""
+        template = "<persona>\n\n</persona>"
+        result = substitute(template, variables={})
+        assert result == ""
+
+    def test_remove_empty_tag_with_mixed_whitespace(self):
+        """Test removing XML tag with mixed whitespace."""
+        template = "<tag>  \n  \t  </tag>"
+        result = substitute(template, variables={})
+        assert result == ""
+
+    def test_keep_tag_with_content(self):
+        """Test that tags with content are preserved."""
+        template = "<persona>expert</persona>"
+        result = substitute(template, variables={})
+        assert result == "<persona>expert</persona>"
+
+    def test_remove_empty_after_variable_substitution(self):
+        """Test that empty tags created by variable substitution are removed."""
+        template = "<persona>[[VAR]]\n</persona>"
+        result = substitute(template, variables={"VAR": ""})
+        assert result == ""
+
+    def test_multiple_empty_tags(self):
+        """Test removing multiple empty XML sections."""
+        template = "<tag1>   </tag1> text <tag2>\n\n</tag2>"
+        result = substitute(template, variables={})
+        assert result == " text "
+
+    def test_nested_tags_with_empty_inner(self):
+        """Test nested tags where inner is empty."""
+        template = "<outer><inner>  </inner></outer>"
+        result = substitute(template, variables={})
+        # inner tag is removed, leaving just outer tags
+        assert result == "<outer></outer>"
+
+    def test_empty_tags_with_surrounding_text(self):
+        """Test empty tags don't affect surrounding text."""
+        template = "Start <persona>\n</persona> End"
+        result = substitute(template, variables={})
+        assert result == "Start  End"
+
+
+class TestEmptyXMLWithComplexSigils:
+    """Test empty XML removal with arbitrary sigils and complex content."""
+
+    def test_empty_tag_with_undefined_variable(self):
+        """Test empty tag created by undefined variable substitution."""
+        template = "<context>[[UNDEFINED_VAR]]\n</context>"
+        result = substitute(template, variables={"OTHER": "value"})
+        assert result == ""
+
+    def test_empty_tag_with_empty_variable_substitution(self):
+        """Test empty tag from variable that resolves to empty string."""
+        template = "<system>[[EMPTY_VAR]]</system>"
+        result = substitute(template, variables={"EMPTY_VAR": ""})
+        assert result == ""
+
+    def test_tag_with_component_content(self):
+        """Test tag containing a component sigil that has content."""
+        template = "<instructions>[[PROMPT: task]]</instructions>"
+        result = substitute(template, components={"task": "Do something"})
+        assert result == "<instructions>Do something</instructions>"
+
+    def test_tag_with_undefined_component(self):
+        """Test tag becomes empty when component doesn't exist raises error."""
+        template = "<instructions>[[PROMPT: missing]]</instructions>"
+        # Undefined component raises error (expected behavior)
+        with pytest.raises(ValueError, match="Undefined component"):
+            substitute(template, components={})
+
+    def test_json_with_empty_tags(self):
+        """Test JSON structure with empty XML tags removed."""
+        template = """{
+  "system": "<system>   </system>",
+  "user": "<user>[[USERNAME]]</user>",
+  "empty": "<tag></tag>"
+}"""
+        result = substitute(template, variables={"USERNAME": "alice"})
+        assert result == """{
+  "system": "",
+  "user": "<user>alice</user>",
+  "empty": ""
+}"""
+
+    def test_complex_nested_with_mixed_empty_and_full(self):
+        """Test complex structure with mix of empty and full tags."""
+        template = """<root>
+  <empty1>  </empty1>
+  <full>[[NAME]]</full>
+  <empty2>
+  </empty2>
+  <nested>
+    <inner_empty>  </inner_empty>
+    <inner_full>[[ROLE]]</inner_full>
+  </nested>
+</root>"""
+        result = substitute(template, variables={"NAME": "Alice", "ROLE": "admin"})
+        # Empty tags are removed, but surrounding whitespace is preserved
+        # The exact whitespace depends on how the empty tags are removed
+        assert "<full>Alice</full>" in result
+        assert "<inner_full>admin</inner_full>" in result
+        # Empty tags should not appear
+        assert "<empty1>" not in result
+        assert "<empty2>" not in result
+        assert "<inner_empty>" not in result
+
+    def test_tag_with_multiple_sigils_some_undefined(self):
+        """Test tag with multiple sigils where some are undefined."""
+        template = "<output>[[VAR1]] [[UNDEF]] [[VAR2]]</output>"
+        result = substitute(template, variables={"VAR1": "hello", "VAR2": "world"})
+        # VAR1 and VAR2 have content, UNDEF is empty, but tag still has content
+        assert result == "<output>hello  world</output>"
+
+    def test_tag_with_all_undefined_sigils(self):
+        """Test tag with only undefined sigils becomes empty."""
+        template = "<output>[[UNDEF1]] [[UNDEF2]]</output>"
+        result = substitute(template, variables={})
+        # All undefined return empty strings, tag becomes empty
+        assert result == ""
+
+    def test_tag_with_recursive_component_substitution(self):
+        """Test empty tag after recursive component substitution."""
+        template = "<wrapper>[[PROMPT: comp1]]</wrapper>"
+        result = substitute(
+            template,
+            components={"comp1": ""},  # Component is empty
+        )
+        assert result == ""
+
+    def test_tag_with_prompt_tag_no_matches(self):
+        """Test tag with PROMPT_TAG that has no matching prompts."""
+        template = "<results>[[PROMPT_TAG: missing_tag]]</results>"
+
+        def tag_resolver(tags):
+            return []  # No prompts match
+
+        result = substitute(
+            template,
+            components={},
+            tag_resolver=tag_resolver,
+        )
+        assert result == ""
+
+    def test_tag_with_prompt_tag_with_content(self):
+        """Test tag with PROMPT_TAG that has matching prompts."""
+        template = "<results>[[PROMPT_TAG: task]]</results>"
+
+        def tag_resolver(tags):
+            return ["task1", "task2"]
+
+        result = substitute(
+            template,
+            components={"task1": "First task", "task2": "Second task"},
+            tag_resolver=tag_resolver,
+        )
+        assert result == "<results>First task\n\nSecond task</results>"
