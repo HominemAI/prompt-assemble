@@ -194,6 +194,7 @@ def create_app(source=None, config=None):
     @app.route("/api/prompts/<name>", methods=["GET"])
     def get_prompt(name):
         """Get full prompt content."""
+        name = name.lower()
         if not app.prompt_source:
             return jsonify({"error": "No prompt source configured"}), 500
 
@@ -208,6 +209,7 @@ def create_app(source=None, config=None):
     @app.route("/api/prompts/<name>", methods=["POST"])
     def save_prompt(name):
         """Save or update a prompt."""
+        name = name.lower()
         if not app.prompt_source:
             return jsonify({"error": "No prompt source configured"}), 500
 
@@ -259,6 +261,7 @@ def create_app(source=None, config=None):
     @app.route("/api/prompts/<name>", methods=["DELETE"])
     def delete_prompt(name):
         """Delete a prompt (if source supports it)."""
+        name = name.lower()
         logger.info(f"DELETE request for prompt: {name}")
         if not app.prompt_source:
             logger.error("No prompt source configured")
@@ -291,6 +294,7 @@ def create_app(source=None, config=None):
     @app.route("/api/prompts/<name>/variable-sets", methods=["GET"])
     def get_prompt_variable_sets(name):
         """Get variable set subscriptions for a prompt/document."""
+        name = name.lower()
         if not hasattr(app.prompt_source, 'connection'):
             return jsonify({"variableSetIds": [], "overrides": {}}), 200
 
@@ -343,6 +347,7 @@ def create_app(source=None, config=None):
     @app.route("/api/prompts/<name>/variable-sets", methods=["POST"])
     def save_prompt_variable_sets(name):
         """Save variable set subscriptions for a prompt/document."""
+        name = name.lower()
         if not hasattr(app.prompt_source, 'connection'):
             return jsonify({"error": "Database source not available"}), 400
 
@@ -412,6 +417,7 @@ def create_app(source=None, config=None):
     @app.route("/api/prompts/<name>/revert/<int:version>", methods=["POST"])
     def revert_prompt(name, version):
         """Revert a prompt to a previous version."""
+        name = name.lower()
         if not hasattr(app.prompt_source, 'connection'):
             return jsonify({"error": "Database not available"}), 500
 
@@ -495,6 +501,7 @@ def create_app(source=None, config=None):
     @app.route("/api/prompts/<name>/history", methods=["GET"])
     def get_prompt_history(name):
         """Get version history for a prompt (max 20 revisions)."""
+        name = name.lower()
         if not hasattr(app.prompt_source, 'connection') or app.prompt_source.connection is None:
             logger.debug(f"[get_prompt_history] No database connection for {name}")
             return jsonify({"versions": []}), 200
