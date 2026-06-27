@@ -1,0 +1,93 @@
+name: Security
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Weekly scan to catch newly disclosed CVEs in unchanged dependencies
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Dependency vulnerability scan (PyPA pip-audit) — known CVEs in deps
+  # ---------------------------------------------------------------------------
+  pip-audit:
+    name: pip-audit (dependencies)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install project
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[ui-full]"
+
+      - name: Run pip-audit
+        uses: pypa/gh-action-pip-audit@v1.1.0
+        with:
+          # Audit the installed environment so all extras are covered
+          local: true
+
+  # ---------------------------------------------------------------------------
+  # Static analysis (CodeQL) — vulnerabilities in our own Python code
+  # Results appear under the repo's Security > Code scanning tab.
+  # ---------------------------------------------------------------------------
+  codeql:
+    name: CodeQL (static analysis)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+          queries: security-extended
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"
+
+  # ---------------------------------------------------------------------------
+  # Trivy filesystem scan — dependency + misconfiguration scan, uploads SARIF
+  # ---------------------------------------------------------------------------
+  trivy:
+    name: Trivy (filesystem)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-fs
