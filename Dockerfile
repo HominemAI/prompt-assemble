@@ -15,7 +15,7 @@ RUN git clone --branch ${FRONTEND_BRANCH} ${FRONTEND_REPO} . && \
     npm run build
 
 # Backend build stage
-FROM python:3.11-slim AS builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
@@ -37,7 +37,7 @@ RUN pip install --no-cache-dir -e ".[ui-full]" && \
     pip install --no-cache-dir flask flask-cors psycopg2-binary
 
 # Runtime stage
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 
