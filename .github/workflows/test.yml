@@ -40,8 +40,10 @@ jobs:
         run: |
           pytest tests/ -v --cov=src/prompt_assemble --cov-report=xml
 
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: HominemAI/prompt-assemble
           files: ./coverage.xml
           fail_ci_if_error: false
