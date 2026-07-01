@@ -14,7 +14,8 @@ Instead, report it privately in one of these two ways:
 
 - **On GitHub:** open the **Security** tab above and click
   **"Report a vulnerability."** This keeps everything private.
-- **By email:** write to **secobs@hominem.ai**.
+- **On the web:** use our security report form at
+  **https://hominem.ai/security**.
 
 ## First, a quick check
 
