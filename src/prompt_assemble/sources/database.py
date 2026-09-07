@@ -4,13 +4,36 @@ import logging
 import os
 import time
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional
+from functools import wraps
+from threading import RLock
+from typing import Any, Callable, Dict, List, Optional
 
 from ..exceptions import PromptNotFoundError, SourceConnectionError
 from ..registry import Registry, RegistryEntry
 from .base import PromptSource
 
 logger = logging.getLogger(__name__)
+
+
+def _retry_read(method):
+    """Retry the outermost read once; never replay writes."""
+    @wraps(method)
+    def wrapped(self, *args, **kwargs):
+        with self._connection_lock:
+            if self._reading:
+                return method(self, *args, **kwargs)
+            self._reading = True
+            try:
+                try:
+                    return method(self, *args, **kwargs)
+                except Exception as exc:
+                    if not self._connection_factory or not self._connection_failed(exc):
+                        raise
+                    self._reconnect()
+                    return method(self, *args, **kwargs)
+            finally:
+                self._reading = False
+    return wrapped
 
 
 class DatabaseSource(PromptSource):
@@ -21,14 +44,22 @@ class DatabaseSource(PromptSource):
     Implements connection pooling to avoid connection exhaustion.
     """
 
-    def __init__(self, connection: Any = None, connection_pool: Any = None, table_prefix: Optional[str] = None):
+    def __init__(
+        self,
+        connection: Any = None,
+        connection_pool: Any = None,
+        table_prefix: Optional[str] = None,
+        connection_factory: Optional[Callable[[], Any]] = None,
+    ):
         """
         Initialize DatabaseSource.
 
         Args:
             connection: DBAPI2-compatible database connection (e.g., psycopg2.connect())
-                       For backward compatibility. If provided, creates a pool with minconn=1, maxconn=5.
+                       Retained as a direct connection; no pool is created.
             connection_pool: psycopg2.pool.SimpleConnectionPool instance (preferred for production)
+            connection_factory: Callable returning a fresh DBAPI2 connection. Enables
+                                recovery of direct connections and one retry for reads.
             table_prefix: Optional prefix for all table names.
                          If not provided, reads from PROMPT_ASSEMBLE_TABLE_PREFIX env var.
                          Defaults to empty string if neither is provided.
@@ -58,16 +89,21 @@ class DatabaseSource(PromptSource):
                 source = DatabaseSource(conn)
         """
         super().__init__()
+        self._connection_lock = RLock()
+        self._reading = False
+        self._connection_factory = connection_factory
+        if connection_pool is not None and connection_factory is not None:
+            raise ValueError("connection_factory cannot be combined with connection_pool")
+        if connection is None and connection_pool is None and connection_factory is not None:
+            connection = connection_factory()
 
         if connection_pool is not None:
             self._pool = connection_pool
             self.connection = None  # Use pool instead
         elif connection is not None:
-            # Backward compatibility: wrap single connection in a simple pool
+            # Direct connections remain direct; recovery requires a factory.
             try:
                 import psycopg2.pool
-                # Create a minimal pool with 1 connection (the provided one won't be used,
-                # but we'll use the pool for consistency)
                 self._pool = None
                 self.connection = connection  # Keep for backward compat
             except ImportError:
@@ -101,6 +137,12 @@ class DatabaseSource(PromptSource):
 
     @contextmanager
     def _get_cursor(self):
+        with self._connection_lock:
+            with self._get_cursor_locked() as cursor:
+                yield cursor
+
+    @contextmanager
+    def _get_cursor_locked(self):
         """Context manager to safely get and close a database cursor.
 
         Handles both connection pool and direct connection scenarios.
@@ -118,6 +160,7 @@ class DatabaseSource(PromptSource):
                     raise
             else:
                 # Use direct connection
+                self._ensure_connection()
                 if self.connection is None:
                     raise SourceConnectionError("Database connection is not initialized")
                 connection = self.connection
@@ -165,6 +208,7 @@ class DatabaseSource(PromptSource):
     def _ensure_schema(self) -> None:
         """Ensure database schema exists."""
         with self._get_cursor() as cursor:
+            original_autocommit = getattr(cursor.connection, "autocommit", False)
             try:
                 # Enable autocommit for schema operations to avoid transaction abort (PostgreSQL only)
                 try:
@@ -393,9 +437,9 @@ class DatabaseSource(PromptSource):
                     pass
                 raise
             finally:
-                # Disable autocommit after schema operations (PostgreSQL only)
+                # Restore the caller's transaction mode after schema operations.
                 try:
-                    cursor.connection.autocommit = False
+                    cursor.connection.autocommit = original_autocommit
                 except (AttributeError, TypeError):
                     # SQLite and other databases don't support autocommit
                     pass
@@ -404,11 +448,12 @@ class DatabaseSource(PromptSource):
                 except:
                     pass
 
+    @_retry_read
     def refresh(self) -> None:
         """Refresh metadata from database (not content)."""
         self._ensure_connection()
-        self._registry.clear()
-        self._metadata_cache.clear()
+        registry = Registry()
+        metadata_cache = {}
 
         with self._get_cursor() as cursor:
             # Get all prompts with their metadata
@@ -423,7 +468,7 @@ class DatabaseSource(PromptSource):
 
             for row in cursor.fetchall():
                 prompt_id, name, version, description, owner = row
-                self._metadata_cache[prompt_id] = {
+                metadata_cache[prompt_id] = {
                     "name": name,
                     "version": version,
                     "description": description or "",
@@ -445,7 +490,10 @@ class DatabaseSource(PromptSource):
                     owner=owner,
                     source_ref=prompt_id,
                 )
-                self._registry.register(entry)
+                registry.register(entry)
+
+        self._registry = registry
+        self._metadata_cache = metadata_cache
 
         # Emit refresh event
         self._emit("refreshed")
@@ -458,24 +506,45 @@ class DatabaseSource(PromptSource):
         elapsed = time.time() - self._last_refresh_time
         return elapsed >= self.refresh_interval_seconds
 
-    def _ensure_connection(self):
-        """Verify connection is alive (no-op for connection pools)."""
-        # When using a connection pool, connections are managed by the pool
-        # and we get a fresh connection from getconn() each time
-        if self._pool is not None:
-            # Connection pool handles reconnection automatically
-            return
-
-        # For direct connections, verify it's still alive
-        if self.connection is None:
-            raise SourceConnectionError("Database connection is not initialized")
+    def _connection_failed(self, exc):
+        if isinstance(exc, SourceConnectionError):
+            return True
+        if getattr(self.connection, "closed", False):
+            return True
         try:
-            if hasattr(self.connection, 'closed') and self.connection.closed:
-                raise SourceConnectionError("Database connection is closed")
-        except Exception:
-            # If check fails, let _get_cursor handle it
-            pass
+            from psycopg2 import InterfaceError, OperationalError
+        except ImportError:
+            return False
+        # SQLSTATE class 08 denotes connection failures. Errors without a
+        # SQLSTATE include dropped sockets; other SQL errors are not retried.
+        return isinstance(exc, (InterfaceError, OperationalError)) and (
+            not exc.pgcode or exc.pgcode.startswith("08")
+        )
 
+    def _reconnect(self):
+        old = self.connection
+        if old is not None:
+            try:
+                old.close()
+            except Exception:
+                logger.debug("Could not close failed connection", exc_info=True)
+        self.connection = None
+        try:
+            self.connection = self._connection_factory()
+        except Exception as exc:
+            raise SourceConnectionError("Failed to reopen database connection") from exc
+
+    def _ensure_connection(self):
+        """Replace a closed direct connection when a factory is available."""
+        if self._pool is not None:
+            return
+        with self._connection_lock:
+            if self.connection is None or getattr(self.connection, "closed", False):
+                if self._connection_factory is None:
+                    raise SourceConnectionError("Database connection is closed")
+                self._reconnect()
+
+    @_retry_read
     def get_raw(self, name: str) -> str:
         """Get the current version of a prompt by name."""
         if self._should_refresh():
@@ -546,6 +615,7 @@ class DatabaseSource(PromptSource):
             self.refresh()
             self._emit("prompt_deleted")
 
+    @_retry_read
     def get_prompt_version(self, name: str, version: Optional[int] = None) -> str:
         """
         Get a specific version of a prompt.
@@ -578,18 +648,21 @@ class DatabaseSource(PromptSource):
                 raise PromptNotFoundError(f"Prompt not found: {name} (version {version})")
             return str(row[0])
 
+    @_retry_read
     def find_by_tag(self, *tags: str) -> List[str]:
         """Find all prompt names matching ALL tags (AND intersection)."""
         if self._should_refresh():
             self.refresh()
         return self._registry.find_by_tags(*tags)
 
+    @_retry_read
     def find_by_owner(self, owner: str) -> List[str]:
         """Find all prompt names owned by a specific owner."""
         if self._should_refresh():
             self.refresh()
         return self._registry.find_by_owner(owner)
 
+    @_retry_read
     def list(self) -> List[str]:
         """List all available prompt names."""
         if self._should_refresh():
@@ -897,6 +970,7 @@ class DatabaseSource(PromptSource):
             cursor.connection.commit()
             return set_id
 
+    @_retry_read
     def get_variable_set(self, set_id: str) -> Optional[Dict[str, Any]]:
         """Get a variable set by ID."""
         with self._get_cursor() as cursor:
@@ -909,6 +983,7 @@ class DatabaseSource(PromptSource):
             variables = self._get_set_variables(cursor, set_id)
             return {"id": set_id, "name": name, "owner": owner, "variables": variables}
 
+    @_retry_read
     def list_variable_sets(self) -> List[Dict[str, Any]]:
         """List all variable sets (global and all scoped)."""
         with self._get_cursor() as cursor:
@@ -920,6 +995,7 @@ class DatabaseSource(PromptSource):
                 sets.append({"id": set_id, "name": name, "owner": owner, "variables": variables})
             return sets
 
+    @_retry_read
     def list_global_variable_sets(self) -> List[Dict[str, Any]]:
         """List only global (unscoped) variable sets."""
         with self._get_cursor() as cursor:
@@ -931,6 +1007,7 @@ class DatabaseSource(PromptSource):
                 sets.append({"id": set_id, "name": name, "owner": None, "variables": variables})
             return sets
 
+    @_retry_read
     def list_variable_sets_by_owner(self, owner: str) -> List[Dict[str, Any]]:
         """List variable sets scoped to a specific owner."""
         with self._get_cursor() as cursor:
@@ -942,6 +1019,7 @@ class DatabaseSource(PromptSource):
                 sets.append({"id": set_id, "name": name, "owner": owner, "variables": variables})
             return sets
 
+    @_retry_read
     def get_available_variable_sets(self, owner: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Get variable sets available to a prompt owner.
@@ -1016,6 +1094,7 @@ class DatabaseSource(PromptSource):
             )
             cursor.connection.commit()
 
+    @_retry_read
     def get_active_variable_sets(self, prompt_id: str) -> List[Dict[str, Any]]:
         """Get all active variable sets for a prompt, in order."""
         with self._get_cursor() as cursor:
@@ -1105,6 +1184,7 @@ class DatabaseSource(PromptSource):
             )
             cursor.connection.commit()
 
+    @_retry_read
     def find_variable_sets(self, name: Optional[str] = None, owner: Optional[str] = None,
                           match_type: str = "exact") -> List[Dict[str, Any]]:
         """
@@ -1154,6 +1234,7 @@ class DatabaseSource(PromptSource):
                 })
             return sets
 
+    @_retry_read
     def get_variable_overrides(self, prompt_id: str, set_id: str) -> Dict[str, str]:
         """Get override values for a specific set in a prompt."""
         with self._get_cursor() as cursor:
