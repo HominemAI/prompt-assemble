@@ -9,7 +9,7 @@ flask-cors>=3.0
 psycopg2-binary>=2.9
 
 # Token counting
-tiktoken>=0.13.0
+tiktoken>=0.14.0
 
 # Development dependencies
 pytest>=7.0
